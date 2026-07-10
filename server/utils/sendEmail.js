@@ -1,33 +1,68 @@
-const { apiInstance, defaultSender, SibApiV3Sdk } = require("../config/brevo");
+const nodemailer = require("nodemailer");
+const { brevo, defaultSender } = require("../config/brevo");
+
+// Fallback to SMTP using nodemailer
+const sendViaSMTP = async (toEmail, name, subject, html, text) => {
+  const SMTP_USER = process.env.EMAIL_USER;
+  const SMTP_PASS = process.env.EMAIL_PASS;
+  
+  if (!SMTP_USER || !SMTP_PASS) {
+    console.error("❌ SMTP credentials not configured for fallback.");
+    throw new Error("All email sending methods failed");
+  }
+
+  const transporter = nodemailer.createTransport({
+    host: process.env.SMTP_HOST || "smtp-relay.brevo.com",
+    port: process.env.SMTP_PORT ? Number(process.env.SMTP_PORT) : 587,
+    secure: process.env.SMTP_SECURE === "true",
+    auth: { user: SMTP_USER, pass: SMTP_PASS },
+  });
+
+  try {
+    const info = await transporter.sendMail({
+      from: `${defaultSender.name} <${defaultSender.email}>`,
+      to: name ? `${name} <${toEmail}>` : toEmail,
+      subject,
+      text: text || "Please enable HTML to view this email.",
+      html: html,
+    });
+    console.log(`✅ Email sent via SMTP fallback to ${toEmail} | MessageId: ${info.messageId}`);
+    return { success: true, messageId: info.messageId };
+  } catch (error) {
+    console.error("❌ SMTP fallback failed:", error.message || error);
+    throw new Error("Email could not be sent via API or SMTP");
+  }
+};
 
 /**
- * Send a transactional email via Brevo
- * @param {Object} options
- * @param {string} options.to - Recipient email
- * @param {string} options.name - Recipient name
- * @param {string} options.subject - Email subject
- * @param {string} options.html - HTML body
- * @param {string} options.text - Plain text body (optional)
+ * Send a transactional email via Brevo with SMTP fallback
  */
 const sendEmail = async ({ to, name, subject, html, text }) => {
   try {
-    const sendSmtpEmail = new SibApiV3Sdk.SendSmtpEmail();
-
-    sendSmtpEmail.sender = defaultSender;
-    sendSmtpEmail.to = [{ email: to, name: name || to }];
-    sendSmtpEmail.subject = subject;
-    sendSmtpEmail.htmlContent = html;
-
-    if (text) {
-      sendSmtpEmail.textContent = text;
+    // If API key is missing or client wasn't initialized, skip to SMTP
+    if (!brevo) {
+      console.warn("⚠️ BREVO_API_KEY not set — attempting SMTP fallback");
+      return await sendViaSMTP(to, name, subject, html, text);
     }
 
-    const result = await apiInstance.sendTransacEmail(sendSmtpEmail);
-    console.log(`✅ Email sent to ${to} | MessageId: ${result.body?.messageId}`);
+    // New v5 syntax for sending emails
+    const result = await brevo.transactionalEmails.sendTransacEmail({
+      sender: defaultSender,
+      to: [{ email: to, name: name || to }],
+      subject: subject,
+      htmlContent: html,
+      textContent: text
+    });
+
+    console.log(`✅ Email sent via Brevo API to ${to} | MessageId: ${result.messageId}`);
     return result;
+    
   } catch (error) {
-    console.error(`❌ Email send failed to ${to}:`, error.message);
-    throw new Error("Email could not be sent");
+    console.error(`⚠️ Brevo API send failed to ${to}:`, error.message);
+    console.log("🔄 Attempting SMTP fallback...");
+    
+    // Fallback if the primary API approach fails
+    return await sendViaSMTP(to, name, subject, html, text);
   }
 };
 

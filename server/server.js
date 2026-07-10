@@ -88,7 +88,7 @@ app.use(errorHandler);
 // ─── Start Server ──────────────────────────────────────────────────────────
 const PORT = process.env.PORT || 5000;
 httpServer.listen(PORT, () => {
-  console.log(`\n🚀 HireLoop Server running in ${process.env.NODE_ENV} mode on port ${PORT}`);
-  console.log(`📡 API Base URL: http://localhost:${PORT}/api`);
-  console.log(`🔌 Socket.io ready\n`);
+  console.log(`\nHireLoop Server running in ${process.env.NODE_ENV} mode on port ${PORT}`);
+  console.log(`API Base URL: http://localhost:${PORT}/api`);
+  console.log(`Socket.io ready`);
 });
