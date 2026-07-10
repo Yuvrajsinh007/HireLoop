@@ -1,8 +1,8 @@
-import { createContext, useContext, useState, useEffect, useCallback } from "react";
-import { useSocket } from "./SocketContext";
+import { createContext, useState, useEffect, useCallback } from "react";
+import { useSocket } from "../hooks/useSocket";
 import API from "../services/api";
 
-const NotificationContext = createContext(null);
+export const NotificationContext = createContext(null);
 
 export const NotificationProvider = ({ children }) => {
   const { socket } = useSocket();
@@ -77,11 +77,3 @@ export const NotificationProvider = ({ children }) => {
     </NotificationContext.Provider>
   );
 };
-
-export const useNotification = () => {
-  const context = useContext(NotificationContext);
-  if (!context) throw new Error("useNotification must be used within NotificationProvider");
-  return context;
-};
-
-export default NotificationContext;

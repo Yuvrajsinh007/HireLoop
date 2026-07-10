@@ -1,8 +1,8 @@
-import { createContext, useContext, useEffect, useState } from "react";
+import { createContext, useEffect, useState } from "react";
 import { io } from "socket.io-client";
-import { useAuth } from "./AuthContext";
+import { useAuth } from "../hooks/useAuth";
 
-const SocketContext = createContext(null);
+export const SocketContext = createContext(null);
 
 export const SocketProvider = ({ children }) => {
   const { token, isAuthenticated } = useAuth();
@@ -45,6 +45,7 @@ export const SocketProvider = ({ children }) => {
     return () => {
       newSocket.disconnect();
     };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isAuthenticated, token]);
 
   return (
@@ -53,11 +54,3 @@ export const SocketProvider = ({ children }) => {
     </SocketContext.Provider>
   );
 };
-
-export const useSocket = () => {
-  const context = useContext(SocketContext);
-  if (!context) throw new Error("useSocket must be used within SocketProvider");
-  return context;
-};
-
-export default SocketContext;

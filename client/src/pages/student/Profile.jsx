@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import DashboardLayout from "../../components/common/DashboardLayout";
 import Avatar from "../../components/common/Avatar";
 import Loader from "../../components/common/Loader";
-import { useAuth } from "../../context/AuthContext";
+import { useAuth } from '../../hooks/useAuth';
 import { getStudentProfile, updateStudentProfile, uploadAvatar, uploadResume } from "../../services/studentService";
 import { BRANCHES, PLACEMENT_STATUSES } from "../../utils/constants";
 import { formatDate } from "../../utils/formatDate";

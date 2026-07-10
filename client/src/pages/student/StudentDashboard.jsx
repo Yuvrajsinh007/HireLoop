@@ -6,7 +6,7 @@ import PlacementChart from "../../components/dashboard/PlacementChart";
 import RecentActivity from "../../components/dashboard/RecentActivity";
 import ProgressFunnel from "../../components/dashboard/ProgressFunnel";
 import Loader from "../../components/common/Loader";
-import { useAuth } from "../../context/AuthContext";
+import { useAuth } from '../../hooks/useAuth';
 import { getDashboardStats, getMyApplications } from "../../services/studentService";
 import { formatDate } from "../../utils/formatDate";
 

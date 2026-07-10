@@ -5,7 +5,7 @@ import BookingModal from "../../components/mentor/BookingModal";
 import SlotPicker from "../../components/mentor/SlotPicker";
 import Loader from "../../components/common/Loader";
 import { getMentors, getMySlots, deleteSlot } from "../../services/mentorService";
-import { useAuth } from "../../context/AuthContext";
+import { useAuth } from '../../hooks/useAuth';
 import { MENTOR_TOPICS } from "../../utils/constants";
 import { formatDate } from "../../utils/formatDate";
 import toast from "react-hot-toast";

@@ -3,7 +3,7 @@ import toast from "react-hot-toast";
 import { getCompanies } from "../../services/companyService";
 import { createExperience } from "../../services/experienceService";
 import { BRANCHES, DIFFICULTY_LEVELS, EXPERIENCE_OUTCOMES, ROUND_TYPES } from "../../utils/constants";
-import { useAuth } from "../../context/AuthContext";
+import { useAuth } from '../../hooks/useAuth';
 
 const currentYear = new Date().getFullYear();
 const YEARS = Array.from({ length: 5 }, (_, i) => currentYear - i);

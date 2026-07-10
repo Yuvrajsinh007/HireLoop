@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from "react";
 import { Link, useNavigate, useLocation } from "react-router-dom";
-import { useAuth } from "../../context/AuthContext";
-import { useNotification } from "../../context/NotificationContext";
+import { useAuth } from "../../hooks/useAuth";
+import { useNotification } from "../../hooks/useNotification";
 import { getDashboardPath, getRoleLabel } from "../../utils/roleHelpers";
 import { timeAgo } from "../../utils/formatDate";
 import { NOTIFICATION_TYPES } from "../../utils/constants";

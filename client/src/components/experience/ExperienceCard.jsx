@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Link } from "react-router-dom";
 import { timeAgo } from "../../utils/formatDate";
 import { upvoteExperience } from "../../services/experienceService";
-import { useAuth } from "../../context/AuthContext";
+import { useAuth } from '../../hooks/useAuth';
 import Avatar from "../common/Avatar";
 import toast from "react-hot-toast";
 

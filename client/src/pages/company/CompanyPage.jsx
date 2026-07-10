@@ -7,7 +7,7 @@ import Loader from "../../components/common/Loader";
 import { getCompany } from "../../services/companyService";
 import { getByCompany } from "../../services/experienceService";
 import { addApplication } from "../../services/studentService";
-import { useAuth } from "../../context/AuthContext";
+import { useAuth } from '../../hooks/useAuth';
 import toast from "react-hot-toast";
 
 const TABS = ["Overview", "Experiences", "Apply"];

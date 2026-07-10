@@ -1,7 +1,8 @@
-import { createContext, useContext, useState, useEffect, useCallback } from "react";
+import { createContext, useState, useEffect, useCallback } from "react";
 import { loginUser, registerUser, getMe } from "../services/authService";
 
-const AuthContext = createContext(null);
+// 1. Export the context directly as a named export
+export const AuthContext = createContext(null);
 
 const TOKEN_KEY = "hireloop_token";
 const USER_KEY = "hireloop_user";
@@ -9,14 +10,15 @@ const USER_KEY = "hireloop_user";
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [token, setToken] = useState(() => localStorage.getItem(TOKEN_KEY));
-  const [loading, setLoading] = useState(true);
+  // Note: Renamed loading to isLoading to match what App.jsx and ProtectedRoute expect
+  const [isLoading, setIsLoading] = useState(true);
 
   // ─── Load user on mount if token exists ─────────────────────────────────
   useEffect(() => {
     const initAuth = async () => {
       const savedToken = localStorage.getItem(TOKEN_KEY);
       if (!savedToken) {
-        setLoading(false);
+        setIsLoading(false);
         return;
       }
       try {
@@ -28,7 +30,7 @@ export const AuthProvider = ({ children }) => {
         setToken(null);
         setUser(null);
       } finally {
-        setLoading(false);
+        setIsLoading(false);
       }
     };
     initAuth();
@@ -76,7 +78,7 @@ export const AuthProvider = ({ children }) => {
   const value = {
     user,
     token,
-    loading,
+    isLoading, // Exported as isLoading so useAuth().isLoading works in App.jsx
     isAuthenticated,
     login,
     register,
@@ -86,11 +88,3 @@ export const AuthProvider = ({ children }) => {
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 };
-
-export const useAuth = () => {
-  const context = useContext(AuthContext);
-  if (!context) throw new Error("useAuth must be used within AuthProvider");
-  return context;
-};
-
-export default AuthContext;

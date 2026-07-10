@@ -1,5 +1,5 @@
 import { NavLink, useLocation } from "react-router-dom";
-import { useAuth } from "../../context/AuthContext";
+import { useAuth } from '../../hooks/useAuth';
 import { ROLES } from "../../utils/constants";
 
 const NAV_ITEMS = {

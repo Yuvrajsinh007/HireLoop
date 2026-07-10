@@ -1,6 +1,12 @@
 const nodemailer = require("nodemailer");
 const { brevo, defaultSender } = require("../config/brevo");
 
+// Import your newly created templates
+const welcomeEmailTemplate = require("../templates/welcomeEmail");
+const passwordResetTemplate = require("../templates/passwordResetEmail");
+const verificationTemplate = require("../templates/verificationEmail");
+const placementAlertTemplate = require("../templates/placementAlertEmail");
+
 // Fallback to SMTP using nodemailer
 const sendViaSMTP = async (toEmail, name, subject, html, text) => {
   const SMTP_USER = process.env.EMAIL_USER;
@@ -39,13 +45,11 @@ const sendViaSMTP = async (toEmail, name, subject, html, text) => {
  */
 const sendEmail = async ({ to, name, subject, html, text }) => {
   try {
-    // If API key is missing or client wasn't initialized, skip to SMTP
     if (!brevo) {
       console.warn("⚠️ BREVO_API_KEY not set — attempting SMTP fallback");
       return await sendViaSMTP(to, name, subject, html, text);
     }
 
-    // New v5 syntax for sending emails
     const result = await brevo.transactionalEmails.sendTransacEmail({
       sender: defaultSender,
       to: [{ email: to, name: name || to }],
@@ -61,29 +65,18 @@ const sendEmail = async ({ to, name, subject, html, text }) => {
     console.error(`⚠️ Brevo API send failed to ${to}:`, error.message);
     console.log("🔄 Attempting SMTP fallback...");
     
-    // Fallback if the primary API approach fails
     return await sendViaSMTP(to, name, subject, html, text);
   }
 };
 
-// ─── Pre-built Email Templates ─────────────────────────────────────────────
+// ─── Pre-built Email Functions ─────────────────────────────────────────────
 
 const sendWelcomeEmail = async ({ to, name }) => {
   await sendEmail({
     to,
     name,
     subject: "Welcome to HireLoop 🎉",
-    html: `
-      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: auto; padding: 20px;">
-        <h2 style="color: #4F46E5;">Welcome to HireLoop, ${name}! 🚀</h2>
-        <p>We're excited to have you on board.</p>
-        <p>HireLoop is your campus placement intelligence platform — track your journey, read senior experiences, and land your dream job.</p>
-        <a href="${process.env.CLIENT_URL}" style="background:#4F46E5;color:white;padding:10px 20px;border-radius:6px;text-decoration:none;display:inline-block;margin-top:10px;">
-          Get Started
-        </a>
-        <p style="margin-top: 20px; color: #888;">— Team HireLoop</p>
-      </div>
-    `,
+    html: welcomeEmailTemplate(name, process.env.CLIENT_URL),
   });
 };
 
@@ -92,18 +85,7 @@ const sendPasswordResetEmail = async ({ to, name, resetURL }) => {
     to,
     name,
     subject: "HireLoop — Password Reset Request",
-    html: `
-      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: auto; padding: 20px;">
-        <h2 style="color: #4F46E5;">Password Reset</h2>
-        <p>Hi ${name},</p>
-        <p>You requested to reset your password. Click the button below. This link expires in <strong>15 minutes</strong>.</p>
-        <a href="${resetURL}" style="background:#4F46E5;color:white;padding:10px 20px;border-radius:6px;text-decoration:none;display:inline-block;margin-top:10px;">
-          Reset Password
-        </a>
-        <p style="margin-top: 20px;">If you didn't request this, please ignore this email.</p>
-        <p style="color: #888;">— Team HireLoop</p>
-      </div>
-    `,
+    html: passwordResetTemplate(name, resetURL),
   });
 };
 
@@ -112,17 +94,7 @@ const sendVerificationEmail = async ({ to, name, verifyURL }) => {
     to,
     name,
     subject: "HireLoop — Verify Your Email",
-    html: `
-      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: auto; padding: 20px;">
-        <h2 style="color: #4F46E5;">Verify Your Email</h2>
-        <p>Hi ${name},</p>
-        <p>Please verify your college email to activate your HireLoop account.</p>
-        <a href="${verifyURL}" style="background:#4F46E5;color:white;padding:10px 20px;border-radius:6px;text-decoration:none;display:inline-block;margin-top:10px;">
-          Verify Email
-        </a>
-        <p style="margin-top: 20px; color: #888;">— Team HireLoop</p>
-      </div>
-    `,
+    html: verificationTemplate(name, verifyURL),
   });
 };
 
@@ -131,18 +103,7 @@ const sendPlacementAlertEmail = async ({ to, name, companyName, driveDate }) => 
     to,
     name,
     subject: `HireLoop — ${companyName} is visiting campus! 🏢`,
-    html: `
-      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: auto; padding: 20px;">
-        <h2 style="color: #4F46E5;">New Campus Drive Alert 🎯</h2>
-        <p>Hi ${name},</p>
-        <p><strong>${companyName}</strong> is visiting your campus on <strong>${driveDate}</strong>.</p>
-        <p>Log in to HireLoop to check eligibility criteria, past interview experiences, and track your application.</p>
-        <a href="${process.env.CLIENT_URL}/companies" style="background:#4F46E5;color:white;padding:10px 20px;border-radius:6px;text-decoration:none;display:inline-block;margin-top:10px;">
-          View Company Details
-        </a>
-        <p style="margin-top: 20px; color: #888;">— Team HireLoop</p>
-      </div>
-    `,
+    html: placementAlertTemplate(name, companyName, driveDate, process.env.CLIENT_URL),
   });
 };
 
