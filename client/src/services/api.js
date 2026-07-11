@@ -25,11 +25,11 @@ API.interceptors.response.use(
   (error) => {
     const message = error.response?.data?.message || "Something went wrong";
 
-    // Auto logout on 401
-    if (error.response?.status === 401) {
+    // Auto logout on 401, but prevent redirect loops
+    if (error.response?.status === 401 && window.location.pathname !== "/login") {
       localStorage.removeItem("hireloop_token");
       localStorage.removeItem("hireloop_user");
-      window.location.href = "/login";
+      window.location.replace("/login"); // replace() is better here than href
     }
 
     return Promise.reject({ ...error, message });

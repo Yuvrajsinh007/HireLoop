@@ -5,6 +5,7 @@ import Loader from "../../components/common/Loader";
 import { getCompanies } from "../../services/companyService";
 import { COMPANY_DOMAINS } from "../../utils/constants";
 import toast from "react-hot-toast";
+import { Search, X, Building2, ChevronLeft, ChevronRight } from "lucide-react";
 
 const DRIVE_FILTERS = [
   { label: "All",       value: ""          },
@@ -44,28 +45,30 @@ const CompanyList = () => {
 
   return (
     <DashboardLayout>
-      <div className="page-wrapper fade-in">
+      <div className="max-w-7xl mx-auto animate-in fade-in duration-500">
 
         {/* Header */}
-        <div className="mb-6">
-          <h1 className="section-title mb-1">Company Intelligence Hub</h1>
-          <p className="text-sm text-gray-500">
-            Browse companies, check round details, and find your perfect match
+        <div className="mb-8">
+          <h1 className="text-2xl md:text-3xl font-bold text-gray-900 tracking-tight mb-1.5">Company Intelligence Hub</h1>
+          <p className="text-sm font-medium text-gray-500">
+            Browse companies, analyze round details, and find your perfect match.
           </p>
         </div>
 
         {/* Filters */}
-        <div className="card mb-6 p-4">
-          <div className="flex flex-wrap gap-3 items-center">
+        <div className="bg-white rounded-2xl p-4 border border-gray-100 shadow-sm mb-8">
+          <div className="flex flex-wrap gap-4 items-center">
             {/* Search */}
-            <div className="relative flex-1 min-w-48">
-              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">🔍</span>
+            <div className="relative flex-1 min-w-[200px]">
+              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">
+                <Search className="w-4 h-4" />
+              </span>
               <input
                 type="text"
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 placeholder="Search companies..."
-                className="input-field pl-9"
+                className="w-full pl-9 pr-4 py-2 bg-gray-50 border border-transparent rounded-lg text-sm focus:outline-none focus:bg-white focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 transition-all"
               />
             </div>
 
@@ -73,7 +76,7 @@ const CompanyList = () => {
             <select
               value={domain}
               onChange={(e) => setDomain(e.target.value)}
-              className="input-field w-auto min-w-36"
+              className="px-4 py-2 bg-gray-50 border border-transparent rounded-lg text-sm font-medium text-gray-700 focus:outline-none focus:bg-white focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 transition-all min-w-[140px]"
             >
               <option value="">All Domains</option>
               {COMPANY_DOMAINS.map((d) => (
@@ -82,15 +85,15 @@ const CompanyList = () => {
             </select>
 
             {/* Drive status tabs */}
-            <div className="flex items-center bg-gray-100 rounded-lg p-1 gap-1">
+            <div className="flex items-center bg-gray-50 border border-gray-100 rounded-lg p-1">
               {DRIVE_FILTERS.map((f) => (
                 <button
                   key={f.value}
                   onClick={() => setDriveStatus(f.value)}
-                  className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors
+                  className={`px-4 py-1.5 rounded-md text-sm font-semibold transition-all duration-200
                     ${driveStatus === f.value
-                      ? "bg-white text-indigo-700 shadow-sm"
-                      : "text-gray-500 hover:text-gray-700"
+                      ? "bg-white text-gray-900 shadow-sm border border-gray-200"
+                      : "text-gray-500 hover:text-gray-900"
                     }`}
                 >
                   {f.label}
@@ -102,34 +105,34 @@ const CompanyList = () => {
             {(search || domain || driveStatus) && (
               <button
                 onClick={() => { setSearch(""); setDomain(""); setDriveStatus(""); }}
-                className="text-sm text-gray-400 hover:text-red-500 transition-colors"
+                className="text-sm font-semibold text-gray-400 hover:text-red-600 transition-colors flex items-center gap-1 px-2"
               >
-                ✕ Clear
+                <X className="w-4 h-4" /> Clear
               </button>
             )}
           </div>
         </div>
 
         {/* Results count */}
-        <div className="flex items-center justify-between mb-4">
-          <p className="text-sm text-gray-500">
+        <div className="flex items-center justify-between mb-4 px-1">
+          <p className="text-sm font-semibold text-gray-500 uppercase tracking-wider">
             {loading ? "Loading..." : `${total} ${total === 1 ? "company" : "companies"} found`}
           </p>
         </div>
 
         {/* Grid */}
         {loading ? (
-          <div className="flex items-center justify-center min-h-64">
-            <Loader size="lg" text="Loading companies..." />
+          <div className="flex items-center justify-center min-h-[40vh]">
+            <Loader />
           </div>
         ) : companies.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-24 text-gray-400">
-            <div className="text-5xl mb-4">🏢</div>
-            <p className="text-lg font-medium text-gray-500">No companies found</p>
-            <p className="text-sm mt-1">Try adjusting your filters</p>
+          <div className="bg-white rounded-2xl border border-gray-100 flex flex-col items-center justify-center py-24 text-gray-400 shadow-sm">
+            <Building2 className="w-16 h-16 mb-4 opacity-20" />
+            <p className="text-lg font-bold text-gray-900 mb-1">No companies found</p>
+            <p className="text-sm font-medium">Try adjusting your search or filters</p>
           </div>
         ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {companies.map((company) => (
               <CompanyCard key={company._id} company={company} />
             ))}
@@ -138,23 +141,23 @@ const CompanyList = () => {
 
         {/* Pagination */}
         {total > 12 && (
-          <div className="flex items-center justify-center gap-3 mt-8">
+          <div className="flex items-center justify-center gap-4 mt-10">
             <button
               onClick={() => setPage((p) => Math.max(1, p - 1))}
               disabled={page === 1}
-              className="btn-secondary px-4 py-2 text-sm disabled:opacity-40"
+              className="bg-white border border-gray-200 text-gray-700 font-medium px-4 py-2 rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1 shadow-sm"
             >
-              ← Prev
+              <ChevronLeft className="w-4 h-4" /> Prev
             </button>
-            <span className="text-sm text-gray-600 font-medium">
+            <span className="text-sm text-gray-600 font-bold bg-gray-100 px-4 py-2 rounded-lg">
               Page {page} of {Math.ceil(total / 12)}
             </span>
             <button
               onClick={() => setPage((p) => p + 1)}
               disabled={page >= Math.ceil(total / 12)}
-              className="btn-secondary px-4 py-2 text-sm disabled:opacity-40"
+              className="bg-white border border-gray-200 text-gray-700 font-medium px-4 py-2 rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1 shadow-sm"
             >
-              Next →
+              Next <ChevronRight className="w-4 h-4" />
             </button>
           </div>
         )}

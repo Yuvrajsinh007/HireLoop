@@ -1,13 +1,13 @@
 const SkillTag = ({ skill, size = "sm" }) => {
-    const sizeClass = size === "lg"
-      ? "px-3 py-1 text-sm"
-      : "px-2.5 py-0.5 text-xs";
-  
-    return (
-      <span className={`inline-flex items-center ${sizeClass} rounded-full font-medium bg-indigo-50 text-indigo-700 border border-indigo-100`}>
-        {skill}
-      </span>
-    );
-  };
-  
-  export default SkillTag;
+  const sizeClass = size === "lg"
+    ? "px-3.5 py-1.5 text-sm"
+    : "px-2.5 py-1 text-xs";
+
+  return (
+    <span className={`inline-flex items-center ${sizeClass} rounded-lg font-bold uppercase tracking-wider bg-brand-50 text-brand-700 border border-brand-100 shadow-sm`}>
+      {skill}
+    </span>
+  );
+};
+
+export default SkillTag;
