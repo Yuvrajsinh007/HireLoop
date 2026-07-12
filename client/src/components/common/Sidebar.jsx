@@ -154,7 +154,7 @@ const Sidebar = ({ isOpen, onClose }) => {
               <div>
                 <p className="text-sm text-yellow-800 font-semibold">Email not verified</p>
                 <p className="text-xs text-yellow-600 mt-1 leading-relaxed">
-                  Check your inbox to verify your account and unlock all features.
+                  Visit your Profile page to verify your email address and unlock all features.
                 </p>
               </div>
             </div>

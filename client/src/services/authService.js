@@ -1,36 +1,21 @@
 import API from "./api";
 
-export const registerUser = async (data) => {
-  const res = await API.post("/auth/register", data);
-  return res.data;
-};
+// ─── Registration & Password Login ────────────────────────────────────────
+export const registerUser   = (data)  => API.post("/auth/register", data);
+export const loginUser      = (data)  => API.post("/auth/login", data);
+export const getMe          = ()      => API.get("/auth/me");
+export const changePassword = (data)  => API.put("/auth/change-password", data);
 
-export const loginUser = async (data) => {
-  const res = await API.post("/auth/login", data);
-  return res.data;
-};
+// ─── OTP Login ────────────────────────────────────────────────────────────
+export const sendLoginOtp   = (email) => API.post("/auth/send-login-otp", { email });
+export const verifyLoginOtp = (email, otp) => API.post("/auth/verify-login-otp", { email, otp });
 
-export const getMe = async () => {
-  const res = await API.get("/auth/me");
-  return res.data;
-};
+// ─── Email Verification OTP (protected — requires JWT) ───────────────────
+export const sendVerifyOtp  = ()      => API.post("/auth/send-verify-otp");
+export const verifyEmailOtp = (otp)   => API.post("/auth/verify-email-otp", { otp });
 
-export const verifyEmail = async (token) => {
-  const res = await API.get(`/auth/verify-email?token=${token}`);
-  return res.data;
-};
-
-export const forgotPassword = async (email) => {
-  const res = await API.post("/auth/forgot-password", { email });
-  return res.data;
-};
-
-export const resetPassword = async (token, newPassword) => {
-  const res = await API.post("/auth/reset-password", { token, newPassword });
-  return res.data;
-};
-
-export const changePassword = async (data) => {
-  const res = await API.put("/auth/change-password", data);
-  return res.data;
-};
+// ─── Forgot Password OTP Flow ─────────────────────────────────────────────
+export const forgotPassword  = (email)                   => API.post("/auth/forgot-password", { email });
+export const verifyResetOtp  = (email, otp)              => API.post("/auth/verify-reset-otp", { email, otp });
+export const resetPassword   = (email, newPassword, confirmPassword) =>
+  API.post("/auth/reset-password", { email, newPassword, confirmPassword });

@@ -6,7 +6,7 @@ const Landing = () => {
   const { isAuthenticated, user } = useAuth();
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-brand-50 via-white to-indigo-50 flex flex-col items-center justify-center px-4 pt-16">
+    <div className="min-h-screen bg-gradient-to-br from-brand-50 via-white to-indigo-50 flex flex-col items-center justify-center px-4 py-8">
       <div className="text-center max-w-3xl animate-in fade-in slide-in-from-bottom-4 duration-500">
         {/* Logo */}
         <div className="flex items-center justify-center gap-2 mb-8">

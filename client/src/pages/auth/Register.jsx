@@ -102,7 +102,7 @@ const Register = () => {
                   value={form.name}
                   onChange={handleChange}
                   className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 transition-all"
-                  placeholder="John Doe"
+                  placeholder="Full Name"
                   autoComplete="name"
                 />
               </div>
@@ -115,7 +115,7 @@ const Register = () => {
                   value={form.email}
                   onChange={handleChange}
                   className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 transition-all"
-                  placeholder="id@charusat.edu.in"
+                  placeholder="College Email"
                   autoComplete="email"
                 />
               </div>
@@ -151,6 +151,7 @@ const Register = () => {
                   className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 transition-all"
                   placeholder="Re-enter password"
                 />
+                
               </div>
 
               <button type="submit" className="w-full bg-brand-600 text-white font-medium py-2.5 rounded-lg hover:bg-brand-700 transition-colors mt-2 flex items-center justify-center gap-2">

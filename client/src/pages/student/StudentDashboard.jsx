@@ -97,7 +97,7 @@ const StudentDashboard = () => {
             <div>
               <p className="text-sm font-bold text-amber-900">Verify your email address</p>
               <p className="text-sm text-amber-700 mt-1">
-                Please check your inbox at <span className="font-semibold">{user?.email}</span> to verify your account and unlock all features.
+                Visit your Profile page to verify your email address and unlock all features.
               </p>
             </div>
           </div>

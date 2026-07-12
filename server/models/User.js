@@ -22,63 +22,59 @@ const userSchema = new mongoose.Schema(
       type: String,
       required: [true, "Password is required"],
       minlength: [6, "Password must be at least 6 characters"],
-      select: false, // Never return password in queries
+      select: false,
     },
     role: {
       type: String,
       enum: ["student", "senior", "officer", "admin"],
       default: "student",
     },
-    avatar: {
-      type: String,
-      default: "",
-    },
-    avatarPublicId: {
-      type: String,
-      default: "",
-    },
-    isEmailVerified: {
-      type: Boolean,
-      default: false,
-    },
-    isActive: {
-      type: Boolean,
-      default: true,
-    },
-    // For password reset
-    resetPasswordToken: String,
-    resetPasswordExpire: Date,
+    avatar: { type: String, default: "" },
+    avatarPublicId: { type: String, default: "" },
+    isEmailVerified: { type: Boolean, default: false },
+    isActive: { type: Boolean, default: true },
+    lastLogin: { type: Date, default: null },
 
-    // For email verification
-    emailVerifyToken: String,
-    emailVerifyExpire: Date,
+    // ─── Email Verification OTP ──────────────────────────────────────────
+    emailVerifyOtp:        { type: String,  select: false },
+    emailVerifyOtpExpire:  { type: Date,    select: false },
+    emailVerifyOtpAttempts:{ type: Number,  default: 0,    select: false },
 
-    lastLogin: {
-      type: Date,
-      default: null,
-    },
+    // ─── Login OTP ────────────────────────────────────────────────────────
+    loginOtp:              { type: String,  select: false },
+    loginOtpExpire:        { type: Date,    select: false },
+    loginOtpAttempts:      { type: Number,  default: 0,    select: false },
+
+    // ─── Password Reset OTP ───────────────────────────────────────────────
+    resetOtp:              { type: String,  select: false },
+    resetOtpExpire:        { type: Date,    select: false },
+    resetOtpAttempts:      { type: Number,  default: 0,    select: false },
+    resetOtpVerified:      { type: Boolean, default: false, select: false },
+
+    // ─── Shared OTP rate limiting ─────────────────────────────────────────
+    lastOtpSentAt:         { type: Date,    select: false },
   },
-  {
-    timestamps: true, // adds createdAt and updatedAt
-  }
+  { timestamps: true }
 );
 
 // ─── Hash password before saving ──────────────────────────────────────────
-// FIX: Removed 'next' callback and just used standard async returns
 userSchema.pre("save", async function () {
   if (!this.isModified("password")) return;
   const salt = await bcrypt.genSalt(12);
   this.password = await bcrypt.hash(this.password, salt);
 });
 
-// ─── Compare password method ───────────────────────────────────────────────
+// ─── Compare password ──────────────────────────────────────────────────────
 userSchema.methods.matchPassword = async function (enteredPassword) {
   return await bcrypt.compare(enteredPassword, this.password);
 };
 
-// ─── Virtual: full avatar URL fallback ────────────────────────────────────
+// ─── Avatar fallback virtual ───────────────────────────────────────────────
 userSchema.virtual("avatarUrl").get(function () {
-  return this.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(this.name)}&background=4F46E5&color=fff`;
+  return (
+    this.avatar ||
+    `https://ui-avatars.com/api/?name=${encodeURIComponent(this.name)}&background=4F46E5&color=fff`
+  );
 });
 
 const User = mongoose.model("User", userSchema);
