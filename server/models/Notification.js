@@ -7,37 +7,36 @@ const notificationSchema = new mongoose.Schema(
       ref: "User",
       required: true,
     },
+
+    // ─── Tenant scoping ───────────────────────────────────────────────────
+    institution: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Institution",
+      default: null,
+    },
+
     type: {
       type: String,
       enum: [
-        "new_drive",           // New company drive announced
-        "application_update",  // Application stage changed
-        "new_experience",      // New experience posted for a company
-        "booking_confirmed",   // Mentor booking confirmed
-        "booking_cancelled",   // Mentor booking cancelled
-        "slot_reminder",       // Upcoming mentor slot reminder
-        "upvote",              // Someone upvoted your experience
-        "system",              // General system notification
+        "new_drive",
+        "application_update",
+        "new_experience",
+        "guidance_request_update",
+        "session_scheduled",
+        "session_cancelled",
+        "session_reminder",
+        "upvote",
+        "alumni_contacted",
+        "system",
       ],
       required: true,
     },
-    title: {
-      type: String,
-      required: true,
-    },
-    message: {
-      type: String,
-      required: true,
-    },
-    link: {
-      type: String, // Frontend route to redirect on click
-      default: "",
-    },
-    isRead: {
-      type: Boolean,
-      default: false,
-    },
-    // Optional references
+    title: { type: String, required: true },
+    message: { type: String, required: true },
+    link: { type: String, default: "" },
+    isRead: { type: Boolean, default: false },
+
+    // ─── Optional references ──────────────────────────────────────────────
     relatedCompany: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "Company",
@@ -53,9 +52,14 @@ const notificationSchema = new mongoose.Schema(
       ref: "Experience",
       default: null,
     },
-    relatedBooking: {
+    relatedGuidanceRequest: {
       type: mongoose.Schema.Types.ObjectId,
-      ref: "Booking",
+      ref: "GuidanceRequest",
+      default: null,
+    },
+    relatedSession: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "MentorshipSession",
       default: null,
     },
   },
@@ -64,9 +68,8 @@ const notificationSchema = new mongoose.Schema(
 
 // Auto-delete notifications older than 30 days
 notificationSchema.index({ createdAt: 1 }, { expireAfterSeconds: 30 * 24 * 60 * 60 });
-
-// Index for fast user notification queries
 notificationSchema.index({ recipient: 1, isRead: 1, createdAt: -1 });
+notificationSchema.index({ institution: 1 });
 
 const Notification = mongoose.model("Notification", notificationSchema);
 module.exports = Notification;

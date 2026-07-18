@@ -1,23 +1,34 @@
 const express = require("express");
 const router  = express.Router();
 const {
-  getDashboard, getStudents, sendDriveAlert,
-  getPlacementReport, getAllUsers, updateUser, verifyExperience,
+  getDashboard,
+  getMembers, getMember, updateMemberStatus,
+  graduateBatch,
+  getPlacementReport,
+  getStaff, updateUser,
 } = require("../controllers/officerController");
-const { protect }   = require("../middleware/authMiddleware");
-const { authorize } = require("../middleware/roleMiddleware");
+const { protect }        = require("../middleware/authMiddleware");
+const { injectTenant }   = require("../middleware/tenantMiddleware");
+const { authorize, authorizeStaff } = require("../middleware/roleMiddleware");
 
-router.use(protect);
+router.use(protect, injectTenant);
 
-// Officer + Admin
-router.get("/dashboard",        authorize("officer","admin"), getDashboard);
-router.get("/students",         authorize("officer","admin"), getStudents);
-router.post("/send-drive-alert",authorize("officer","admin"), sendDriveAlert);
-router.get("/reports",          authorize("officer","admin"), getPlacementReport);
+// ── Dashboard ─────────────────────────────────────────────────────────────
+router.get("/dashboard",          authorizeStaff, getDashboard);
 
-// Admin only
-router.get("/admin/users",                    authorize("admin"), getAllUsers);
-router.put("/admin/users/:id",                authorize("admin"), updateUser);
-router.put("/admin/experiences/:id/verify",   authorize("admin"), verifyExperience);
+// ── Members ───────────────────────────────────────────────────────────────
+router.get("/members",            authorizeStaff, getMembers);
+router.get("/members/:userId",    authorizeStaff, getMember);
+router.put("/members/:userId/status", authorizeStaff, updateMemberStatus);
+
+// ── Batch graduation (admin only) ─────────────────────────────────────────
+router.post("/graduate-batch",    authorize("collegeAdmin","superAdmin"), graduateBatch);
+
+// ── Reports ───────────────────────────────────────────────────────────────
+router.get("/reports",            authorizeStaff, getPlacementReport);
+
+// ── Staff management (admin only) ────────────────────────────────────────
+router.get("/staff",              authorize("collegeAdmin","superAdmin"), getStaff);
+router.put("/users/:id",          authorize("collegeAdmin","superAdmin"), updateUser);
 
 module.exports = router;

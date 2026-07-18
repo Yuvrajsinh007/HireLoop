@@ -1,14 +1,39 @@
-const placementAlertTemplate = (name, companyName, driveDate, clientUrl) => `
-  <div style="font-family: Arial, sans-serif; max-width: 600px; margin: auto; padding: 20px;">
-    <h2 style="color: #4F46E5;">New Campus Drive Alert 🎯</h2>
-    <p>Hi ${name},</p>
-    <p><strong>${companyName}</strong> is visiting your campus on <strong>${driveDate}</strong>.</p>
-    <p>Log in to HireLoop to check eligibility criteria, past interview experiences, and track your application.</p>
-    <a href="${clientUrl}/companies" style="background:#4F46E5;color:white;padding:10px 20px;border-radius:6px;text-decoration:none;display:inline-block;margin-top:10px;">
-      View Company Details
-    </a>
-    <p style="margin-top: 20px; color: #888;">— Team HireLoop</p>
+// verificationEmail.js
+const verificationOtpTemplate = (name, otp) => `
+  <div style="background-color: #f3f4f6; padding: 40px 20px; font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;">
+    <div style="max-width: 600px; margin: 0 auto; background-color: #ffffff; border-radius: 12px; overflow: hidden; border: 1px solid #e5e7eb; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);">
+      
+      <div style="padding: 40px 32px;">
+        <div style="text-align: center; margin-bottom: 32px;">
+          <span style="color: #4F46E5; font-size: 24px; font-weight: 800; letter-spacing: 1px;">HireLoop</span>
+        </div>
+        
+        <h2 style="color: #111827; font-size: 22px; margin-top: 0; text-align: center;">Verify Your Email</h2>
+        <p style="color: #4b5563; font-size: 16px; line-height: 1.6; text-align: center;">
+          Hi <strong style="color: #111827;">${name}</strong>,<br>
+          Use the verification code below to confirm your email address.
+        </p>
+        
+        <div style="text-align: center; margin: 40px 0;">
+          <div style="display: inline-block; background-color: #EEF2FF; border: 2px dashed #818cf8; border-radius: 8px; padding: 24px 48px;">
+            <p style="margin: 0; font-size: 12px; text-transform: uppercase; letter-spacing: 2px; color: #4F46E5; font-weight: 700; margin-bottom: 12px;">Verification Code</p>
+            <p style="margin: 0; font-size: 42px; font-weight: 800; letter-spacing: 8px; color: #312e81;">${otp}</p>
+          </div>
+        </div>
+        
+        <p style="color: #6b7280; font-size: 14px; text-align: center; margin-bottom: 8px;">
+          This code will expire in <strong>10 minutes</strong>.
+        </p>
+        <p style="color: #9ca3af; font-size: 13px; text-align: center; margin-top: 0;">
+          If you didn't request this, you can safely ignore this email.
+        </p>
+      </div>
+
+      <div style="background-color: #f9fafb; padding: 24px; text-align: center; border-top: 1px solid #e5e7eb;">
+        <p style="color: #9ca3af; font-size: 13px; margin: 0;">— Team HireLoop</p>
+      </div>
+    </div>
   </div>
 `;
 
-module.exports = placementAlertTemplate;
+module.exports = verificationOtpTemplate;

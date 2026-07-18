@@ -7,15 +7,15 @@ const TOKEN_KEY = "hireloop_token";
 const USER_KEY  = "hireloop_user";
 
 export const AuthProvider = ({ children }) => {
-  const [user, setUser]         = useState(null);
-  const [token, setToken]       = useState(() => localStorage.getItem(TOKEN_KEY));
+  const [user, setUser]           = useState(null);
+  const [token, setToken]         = useState(() => localStorage.getItem(TOKEN_KEY));
   const [isLoading, setIsLoading] = useState(true);
 
-  // ─── Init: load user from token ───────────────────────────────────────
+  // ─── Init ──────────────────────────────────────────────────────────────
   useEffect(() => {
-    const initAuth = async () => {
-      const savedToken = localStorage.getItem(TOKEN_KEY);
-      if (!savedToken) { setIsLoading(false); return; }
+    const init = async () => {
+      const saved = localStorage.getItem(TOKEN_KEY);
+      if (!saved) { setIsLoading(false); return; }
       try {
         const res = await getMe();
         setUser(res.data.data);
@@ -28,29 +28,29 @@ export const AuthProvider = ({ children }) => {
         setIsLoading(false);
       }
     };
-    initAuth();
+    init();
   }, []);
 
-  // ─── Password Login ────────────────────────────────────────────────────
+  // ─── Login ─────────────────────────────────────────────────────────────
   const login = useCallback(async (email, password) => {
     const res = await loginUser({ email, password });
-    const { token: newToken, user: newUser } = res.data.data;
-    localStorage.setItem(TOKEN_KEY, newToken);
-    localStorage.setItem(USER_KEY, JSON.stringify(newUser));
-    setToken(newToken);
-    setUser(newUser);
-    return newUser;
+    const { token: t, user: u } = res.data.data;
+    localStorage.setItem(TOKEN_KEY, t);
+    localStorage.setItem(USER_KEY, JSON.stringify(u));
+    setToken(t);
+    setUser(u);
+    return u;
   }, []);
 
   // ─── Register ──────────────────────────────────────────────────────────
-  const register = useCallback(async (name, email, password, role) => {
-    const res = await registerUser({ name, email, password, role });
-    const { token: newToken, user: newUser } = res.data.data;
-    localStorage.setItem(TOKEN_KEY, newToken);
-    localStorage.setItem(USER_KEY, JSON.stringify(newUser));
-    setToken(newToken);
-    setUser(newUser);
-    return newUser;
+  const register = useCallback(async (data) => {
+    const res = await registerUser(data);
+    const { token: t, user: u } = res.data.data;
+    localStorage.setItem(TOKEN_KEY, t);
+    localStorage.setItem(USER_KEY, JSON.stringify(u));
+    setToken(t);
+    setUser(u);
+    return u;
   }, []);
 
   // ─── Logout ────────────────────────────────────────────────────────────
@@ -61,26 +61,42 @@ export const AuthProvider = ({ children }) => {
     setUser(null);
   }, []);
 
-  // ─── Update user state (profile edit, email verify, OTP login) ─────────
-  const updateUser = useCallback((updatedUser) => {
+  // ─── Update user (profile edit, email verify, OTP login) ──────────────
+  const updateUser = useCallback((updates) => {
     setUser((prev) => {
-      const merged = { ...prev, ...updatedUser };
+      const merged = { ...prev, ...updates };
       localStorage.setItem(USER_KEY, JSON.stringify(merged));
       return merged;
     });
-    // Also update token if provided
-    if (updatedUser.token) {
-      localStorage.setItem(TOKEN_KEY, updatedUser.token);
-      setToken(updatedUser.token);
+    if (updates.token) {
+      localStorage.setItem(TOKEN_KEY, updates.token);
+      setToken(updates.token);
     }
   }, []);
 
   const isAuthenticated = !!token && !!user;
 
+  // ─── Derived helpers ───────────────────────────────────────────────────
+  const isCurrentStudent = user
+    ? ["ENROLLED","FINAL_YEAR"].includes(user.academicStatus)
+    : false;
+
+  const isAlumni = user?.academicStatus === "GRADUATED";
+
+  const isStaff = user
+    ? ["collegeAdmin","officer","superAdmin"].includes(user.role)
+    : false;
+
+  const isSuperAdmin   = user?.role === "superAdmin";
+  const isCollegeAdmin = user?.role === "collegeAdmin";
+  const isOfficer      = user?.role === "officer";
+
   return (
     <AuthContext.Provider value={{
       user, token, isLoading, isAuthenticated,
       login, register, logout, updateUser,
+      isCurrentStudent, isAlumni, isStaff,
+      isSuperAdmin, isCollegeAdmin, isOfficer,
     }}>
       {children}
     </AuthContext.Provider>

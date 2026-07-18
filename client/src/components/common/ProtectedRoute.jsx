@@ -1,30 +1,56 @@
-import React from 'react';
-import { Navigate, Outlet, useLocation } from 'react-router-dom';
-import { useAuth } from '../../hooks/useAuth';
-import Loader from './Loader';
+import { Navigate, Outlet, useLocation } from "react-router-dom";
+import { useAuth } from "../../hooks/useAuth";
+import Loader from "./Loader";
 
-const ProtectedRoute = ({ allowedRoles = [] }) => {
-  const { user, isAuthenticated, isLoading } = useAuth();
+/**
+ * ProtectedRoute
+ * allowedRoles   — system roles: ["member","officer","collegeAdmin","superAdmin"]
+ * allowedAcademic — academic statuses: ["ENROLLED","FINAL_YEAR","GRADUATED"]
+ * staffOnly      — shortcut for officer+collegeAdmin+superAdmin
+ * alumniOnly     — shortcut for GRADUATED members
+ * studentOnly    — shortcut for ENROLLED+FINAL_YEAR members
+ */
+const ProtectedRoute = ({
+  allowedRoles,
+  allowedAcademic,
+  staffOnly,
+  alumniOnly,
+  studentOnly,
+}) => {
+  const { isAuthenticated, user, isLoading } = useAuth();
   const location = useLocation();
 
-  // Show the loader while the authentication state is being verified
-  if (isLoading) {
-    return <Loader />;
-  }
+  if (isLoading) return <Loader fullScreen />;
 
-  // If the user is not logged in, redirect them to the login page
-  // We pass the current location in state so we can redirect them back after they log in
   if (!isAuthenticated) {
     return <Navigate to="/login" state={{ from: location }} replace />;
   }
 
-  // If roles are specified, check if the user's role is in the allowed list
-  if (allowedRoles.length > 0 && user && !allowedRoles.includes(user.role)) {
-    // Redirect unauthorized users back to their respective home/dashboard
-    return <Navigate to="/" replace />;
+  // Staff only shortcut
+  if (staffOnly && !["collegeAdmin","officer","superAdmin"].includes(user?.role)) {
+    return <Navigate to="/unauthorized" replace />;
   }
 
-  // If authenticated (and authorized), render the child components (the nested routes)
+  // Alumni only shortcut
+  if (alumniOnly && user?.academicStatus !== "GRADUATED") {
+    return <Navigate to="/unauthorized" replace />;
+  }
+
+  // Student only shortcut
+  if (studentOnly && !["ENROLLED","FINAL_YEAR"].includes(user?.academicStatus)) {
+    return <Navigate to="/unauthorized" replace />;
+  }
+
+  // Role check
+  if (allowedRoles && !allowedRoles.includes(user?.role)) {
+    return <Navigate to="/unauthorized" replace />;
+  }
+
+  // Academic status check
+  if (allowedAcademic && !allowedAcademic.includes(user?.academicStatus)) {
+    return <Navigate to="/unauthorized" replace />;
+  }
+
   return <Outlet />;
 };
 

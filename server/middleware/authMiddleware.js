@@ -6,7 +6,6 @@ const protect = async (req, res, next) => {
   try {
     let token;
 
-    // Get token from Authorization header
     if (
       req.headers.authorization &&
       req.headers.authorization.startsWith("Bearer")
@@ -18,11 +17,12 @@ const protect = async (req, res, next) => {
       return errorResponse(res, 401, "Not authorized, no token provided");
     }
 
-    // Verify token
     const decoded = verifyToken(token);
 
-    // Get user from DB (exclude password)
-    const user = await User.findById(decoded.id).select("-password");
+    // Populate institution so tenant middleware can use it
+    const user = await User.findById(decoded.id)
+      .select("-password")
+      .populate("institution", "_id name status isActive");
 
     if (!user) {
       return errorResponse(res, 401, "User not found, token invalid");
@@ -32,7 +32,19 @@ const protect = async (req, res, next) => {
       return errorResponse(res, 401, "Your account has been deactivated");
     }
 
-    // Attach user to request
+    // Block access if institution is suspended (except superAdmin)
+    if (
+      user.role !== "superAdmin" &&
+      user.institution &&
+      user.institution.status !== "active"
+    ) {
+      return errorResponse(
+        res,
+        403,
+        "Your institution is not active on this platform. Please contact support."
+      );
+    }
+
     req.user = user;
     next();
   } catch (error) {

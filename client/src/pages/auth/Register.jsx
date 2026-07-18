@@ -1,122 +1,172 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import toast from "react-hot-toast";
-import { useAuth } from '../../hooks/useAuth';
-import { Eye, EyeOff, Loader2, GraduationCap, Award, ArrowRight } from "lucide-react";
+import { useAuth } from "../../hooks/useAuth";
+import { lookupDomain } from "../../services/institutionService";
+import { getDashboardPath } from "../../utils/roleHelpers";
+import { Eye, EyeOff, Loader2, GraduationCap, Users } from "lucide-react";
 
-const ROLES = [
-  {
-    value: "student",
-    label: "Student",
-    icon: GraduationCap,
-    desc: "Currently pursuing a degree, preparing for placements",
-  },
-  {
-    value: "senior",
-    label: "Senior / Alumni",
-    icon: Award,
-    desc: "Already placed or graduated, ready to mentor juniors",
-  },
+const INTENTS = [
+  { value: "student", label: "Current Student", icon: "🎓", desc: "I am currently enrolled in college" },
+  { value: "alumni",  label: "Alumni",           icon: "🏅", desc: "I have graduated from college" },
 ];
 
 const Register = () => {
   const navigate = useNavigate();
   const { register } = useAuth();
 
-  const [form, setForm] = useState({
-    name: "",
-    email: "",
-    password: "",
-    confirmPassword: "",
-    role: "student",
-  });
-  const [showPassword, setShowPassword] = useState(false);
+  const [step, setStep]     = useState(1); // 1=email, 2=details, 3=intent
   const [loading, setLoading] = useState(false);
-  const [step, setStep] = useState(1);
+  const [showPw, setShowPw] = useState(false);
 
-  const handleChange = (e) => {
-    setForm((prev) => ({ ...prev, [e.target.name]: e.target.value }));
+  const [email, setEmail]   = useState("");
+  const [institution, setInstitution] = useState(null);
+  const [domainLoading, setDomainLoading] = useState(false);
+
+  const [form, setForm] = useState({
+    name: "", password: "", confirmPassword: "",
+    registrationIntent: "student",
+  });
+
+  // ── Step 1: Check email domain ─────────────────────────────────────────
+  const handleEmailCheck = async (e) => {
+    e.preventDefault();
+    if (!email || !email.includes("@"))
+      return toast.error("Please enter a valid email address");
+
+    try {
+      setDomainLoading(true);
+      const res = await lookupDomain(email);
+      const data = res.data.data;
+
+      if (!data.found) {
+        return toast.error(
+          "Your institution is not registered on HireLoop. Ask your placement office to register."
+        );
+      }
+
+      setInstitution(data.institution);
+      setStep(2);
+      toast.success(`Found: ${data.institution.name} ✅`);
+    } catch {
+      toast.error("Could not verify your email domain. Please try again.");
+    } finally {
+      setDomainLoading(false);
+    }
   };
 
-  const handleStep1 = (e) => {
+  // ── Step 2: Fill details ───────────────────────────────────────────────
+  const handleDetailsNext = (e) => {
     e.preventDefault();
-    if (!form.name.trim()) return toast.error("Name is required");
-    if (!form.email.trim()) return toast.error("Email is required");
+    if (!form.name.trim())        return toast.error("Name is required");
     if (form.password.length < 6) return toast.error("Password must be at least 6 characters");
     if (form.password !== form.confirmPassword) return toast.error("Passwords do not match");
-    setStep(2);
+    setStep(3);
   };
 
+  // ── Step 3: Submit ─────────────────────────────────────────────────────
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
       setLoading(true);
-      const user = await register(form.name, form.email, form.password, form.role);
-      toast.success(`Account created successfully!`);
-      navigate("/dashboard");
+      const user = await register({
+        name:                form.name,
+        email,
+        password:            form.password,
+        registrationIntent:  form.registrationIntent,
+      });
+      toast.success(`Welcome to HireLoop, ${user.name.split(" ")[0]}! 🎉`);
+      navigate(getDashboardPath(user));
     } catch (err) {
       toast.error(err?.response?.data?.message || "Registration failed");
-      setStep(1);
+      setStep(2);
     } finally {
       setLoading(false);
     }
   };
 
+  const STEPS = ["Verify Email", "Your Details", "Account Type"];
+
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4 py-20">
-      <div className="w-full max-w-md animate-in fade-in zoom-in-95 duration-300">
-        
+    <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4 py-10">
+      <div className="w-full max-w-md">
+
+        {/* Logo */}
         <div className="text-center mb-8">
           <Link to="/" className="inline-flex items-center gap-2.5 mb-6">
-            <div className="w-10 h-10 bg-brand-600 rounded-xl flex items-center justify-center shadow-sm">
+            <div className="w-10 h-10 bg-indigo-600 rounded-xl flex items-center justify-center shadow-sm">
               <span className="text-white font-bold text-lg">H</span>
             </div>
             <span className="text-2xl font-bold text-gray-900 tracking-tight">HireLoop</span>
           </Link>
           <h2 className="text-2xl font-bold text-gray-900">Create your account</h2>
-          <p className="text-gray-500 mt-2 text-sm">Join your campus placement intelligence network</p>
+          <p className="text-gray-500 mt-2 text-sm">Join your campus placement community</p>
         </div>
 
-        {/* Step Indicator */}
-        <div className="flex items-center justify-center gap-3 mb-8 px-4">
-          <div className="flex items-center gap-2">
-            <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${step >= 1 ? "bg-brand-600 text-white" : "bg-gray-200 text-gray-500"}`}>1</div>
-            <span className={`text-xs font-semibold ${step >= 1 ? "text-gray-900" : "text-gray-400"}`}>Details</span>
-          </div>
-          <div className={`w-12 h-px ${step === 2 ? "bg-brand-600" : "bg-gray-200"}`} />
-          <div className="flex items-center gap-2">
-            <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${step === 2 ? "bg-brand-600 text-white" : "bg-gray-200 text-gray-500"}`}>2</div>
-            <span className={`text-xs font-semibold ${step === 2 ? "text-gray-900" : "text-gray-400"}`}>Role</span>
-          </div>
+        {/* Step indicator */}
+        <div className="flex items-center gap-2 mb-6 px-2">
+          {STEPS.map((s, i) => (
+            <div key={s} className="flex items-center gap-2 flex-1">
+              <div className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold transition-colors flex-shrink-0
+                ${step > i + 1 ? "bg-green-500 text-white" : step === i + 1 ? "bg-indigo-600 text-white" : "bg-gray-200 text-gray-400"}`}>
+                {step > i + 1 ? "✓" : i + 1}
+              </div>
+              <span className={`text-xs font-medium hidden sm:block ${step === i + 1 ? "text-indigo-600" : "text-gray-400"}`}>{s}</span>
+              {i < 2 && <div className={`flex-1 h-px ${step > i + 1 ? "bg-green-400" : "bg-gray-200"}`} />}
+            </div>
+          ))}
         </div>
 
         <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-8">
-          
-          {step === 1 && (
-            <form onSubmit={handleStep1} className="space-y-4 animate-in slide-in-from-left-4 duration-300">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1.5">Full Name</label>
-                <input
-                  type="text"
-                  name="name"
-                  value={form.name}
-                  onChange={handleChange}
-                  className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 transition-all"
-                  placeholder="Full Name"
-                  autoComplete="name"
-                />
-              </div>
 
+          {/* ── Step 1: Email check ── */}
+          {step === 1 && (
+            <form onSubmit={handleEmailCheck} className="space-y-5">
+              <div className="text-center mb-2">
+                <p className="text-sm text-gray-500">Enter your college email to detect your institution automatically.</p>
+              </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1.5">College Email</label>
                 <input
-                  type="email"
-                  name="email"
-                  value={form.email}
-                  onChange={handleChange}
-                  className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 transition-all"
-                  placeholder="College Email"
+                  type="email" value={email} onChange={(e) => setEmail(e.target.value)}
+                  className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all"
+                  placeholder="yourname@college.edu.in"
                   autoComplete="email"
+                />
+              </div>
+              <button type="submit" disabled={domainLoading}
+                className="w-full bg-indigo-600 text-white font-medium py-2.5 rounded-lg hover:bg-indigo-700 transition-colors disabled:opacity-70 flex items-center justify-center">
+                {domainLoading ? <Loader2 className="w-5 h-5 animate-spin" /> : "Verify Email →"}
+              </button>
+              <p className="text-center text-sm text-gray-500">
+                Already have an account?{" "}
+                <Link to="/login" className="text-indigo-600 font-medium hover:text-indigo-700">Sign in</Link>
+              </p>
+            </form>
+          )}
+
+          {/* ── Step 2: Details ── */}
+          {step === 2 && (
+            <form onSubmit={handleDetailsNext} className="space-y-5">
+              {institution && (
+                <div className="flex items-center gap-3 p-3 bg-indigo-50 rounded-xl border border-indigo-100 mb-2">
+                  {institution.logo
+                    ? <img src={institution.logo} alt={institution.name} className="w-10 h-10 rounded-lg object-cover" />
+                    : <div className="w-10 h-10 bg-indigo-600 rounded-lg flex items-center justify-center text-white font-bold text-sm">{institution.name?.[0]}</div>
+                  }
+                  <div>
+                    <p className="text-sm font-semibold text-indigo-800">{institution.name}</p>
+                    <p className="text-xs text-indigo-500">{email}</p>
+                  </div>
+                </div>
+              )}
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1.5">Full Name</label>
+                <input
+                  type="text" value={form.name} onChange={(e) => setForm((p) => ({ ...p, name: e.target.value }))}
+                  className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all"
+                  placeholder="Your full name" autoComplete="name"
                 />
               </div>
 
@@ -124,19 +174,15 @@ const Register = () => {
                 <label className="block text-sm font-medium text-gray-700 mb-1.5">Password</label>
                 <div className="relative">
                   <input
-                    type={showPassword ? "text" : "password"}
-                    name="password"
+                    type={showPw ? "text" : "password"}
                     value={form.password}
-                    onChange={handleChange}
-                    className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 transition-all pr-10"
+                    onChange={(e) => setForm((p) => ({ ...p, password: e.target.value }))}
+                    className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all pr-10"
                     placeholder="Min. 6 characters"
                   />
-                  <button
-                    type="button"
-                    onClick={() => setShowPassword((p) => !p)}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
-                  >
-                    {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  <button type="button" onClick={() => setShowPw((p) => !p)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
+                    {showPw ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                   </button>
                 </div>
               </div>
@@ -144,87 +190,75 @@ const Register = () => {
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1.5">Confirm Password</label>
                 <input
-                  type={showPassword ? "text" : "password"}
-                  name="confirmPassword"
+                  type={showPw ? "text" : "password"}
                   value={form.confirmPassword}
-                  onChange={handleChange}
-                  className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 transition-all"
+                  onChange={(e) => setForm((p) => ({ ...p, confirmPassword: e.target.value }))}
+                  className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all"
                   placeholder="Re-enter password"
                 />
-                
+                {form.confirmPassword && (
+                  <p className={`text-xs mt-1 ${form.password === form.confirmPassword ? "text-green-600" : "text-red-500"}`}>
+                    {form.password === form.confirmPassword ? "✅ Passwords match" : "❌ Passwords do not match"}
+                  </p>
+                )}
               </div>
 
-              <button type="submit" className="w-full bg-brand-600 text-white font-medium py-2.5 rounded-lg hover:bg-brand-700 transition-colors mt-2 flex items-center justify-center gap-2">
-                Continue <ArrowRight className="w-4 h-4" />
-              </button>
+              <div className="flex gap-3">
+                <button type="button" onClick={() => setStep(1)} className="btn-secondary flex-1">← Back</button>
+                <button type="submit" className="btn-primary flex-1">Continue →</button>
+              </div>
             </form>
           )}
 
-          {step === 2 && (
-            <form onSubmit={handleSubmit} className="space-y-5 animate-in slide-in-from-right-4 duration-300">
-              <p className="text-sm text-gray-600 font-medium mb-1">Select your primary role:</p>
-              
+          {/* ── Step 3: Intent selection ── */}
+          {step === 3 && (
+            <form onSubmit={handleSubmit} className="space-y-5">
+              <p className="text-sm text-gray-600 font-medium text-center mb-2">
+                I am joining HireLoop as a:
+              </p>
               <div className="space-y-3">
-                {ROLES.map((r) => (
-                  <label
-                    key={r.value}
-                    className={`flex items-start gap-4 p-4 rounded-xl border-2 cursor-pointer transition-all ${
-                      form.role === r.value
-                        ? "border-brand-500 bg-brand-50"
-                        : "border-gray-100 hover:border-gray-200"
-                    }`}
+                {INTENTS.map((intent) => (
+                  <label key={intent.value}
+                    className={`flex items-start gap-4 p-4 rounded-xl border-2 cursor-pointer transition-all
+                      ${form.registrationIntent === intent.value
+                        ? "border-indigo-500 bg-indigo-50"
+                        : "border-gray-200 hover:border-indigo-300"
+                      }`}
                   >
                     <input
-                      type="radio"
-                      name="role"
-                      value={r.value}
-                      checked={form.role === r.value}
-                      onChange={handleChange}
-                      className="mt-1 flex-shrink-0 text-brand-600 focus:ring-brand-500"
+                      type="radio" name="registrationIntent" value={intent.value}
+                      checked={form.registrationIntent === intent.value}
+                      onChange={(e) => setForm((p) => ({ ...p, registrationIntent: e.target.value }))}
+                      className="mt-1 accent-indigo-600"
                     />
                     <div>
-                      <div className="flex items-center gap-2 mb-1">
-                        <r.icon className={`w-5 h-5 ${form.role === r.value ? 'text-brand-600' : 'text-gray-500'}`} />
-                        <span className={`font-semibold ${form.role === r.value ? 'text-brand-900' : 'text-gray-700'}`}>{r.label}</span>
+                      <div className="flex items-center gap-2">
+                        <span className="text-xl">{intent.icon}</span>
+                        <span className="font-semibold text-gray-800">{intent.label}</span>
                       </div>
-                      <p className="text-xs text-gray-500 leading-relaxed">{r.desc}</p>
+                      <p className="text-xs text-gray-500 mt-0.5">{intent.desc}</p>
                     </div>
                   </label>
                 ))}
               </div>
 
-              <div className="flex gap-3 pt-4">
-                <button
-                  type="button"
-                  onClick={() => setStep(1)}
-                  className="flex-1 bg-white border border-gray-200 text-gray-700 font-medium py-2.5 rounded-lg hover:bg-gray-50 transition-colors"
-                >
-                  Back
-                </button>
-                <button
-                  type="submit"
-                  disabled={loading}
-                  className="flex-[2] bg-brand-600 text-white font-medium py-2.5 rounded-lg hover:bg-brand-700 transition-colors disabled:opacity-70 flex items-center justify-center"
-                >
-                  {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : "Create Account"}
+              <div className="flex gap-3 pt-2">
+                <button type="button" onClick={() => setStep(2)} className="btn-secondary flex-1">← Back</button>
+                <button type="submit" disabled={loading} className="btn-primary flex-1">
+                  {loading ? (
+                    <span className="flex items-center justify-center gap-2">
+                      <Loader2 className="w-4 h-4 animate-spin" /> Creating...
+                    </span>
+                  ) : "Create Account 🚀"}
                 </button>
               </div>
             </form>
           )}
-
-          <div className="flex items-center gap-3 my-6">
-            <div className="flex-1 h-px bg-gray-100" />
-            <span className="text-xs font-medium text-gray-400 uppercase">Or</span>
-            <div className="flex-1 h-px bg-gray-100" />
-          </div>
-
-          <p className="text-center text-sm text-gray-500">
-            Already have an account?{" "}
-            <Link to="/login" className="text-brand-600 font-medium hover:text-brand-700">
-              Sign in instead
-            </Link>
-          </p>
         </div>
+
+        <p className="text-center text-xs text-gray-400 mt-4">
+          By registering, you agree to maintain academic integrity and authenticity.
+        </p>
       </div>
     </div>
   );

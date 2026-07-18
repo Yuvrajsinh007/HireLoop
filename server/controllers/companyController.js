@@ -1,18 +1,18 @@
-const Company = require("../models/Company");
+const Company      = require("../models/Company");
+const PlacementDrive = require("../models/PlacementDrive");
 const { uploadToCloudinary, deleteFromCloudinary } = require("../config/cloudinary");
 const { successResponse, errorResponse } = require("../utils/apiResponse");
 
-// ─── GET ALL COMPANIES ────────────────────────────────────────────────────
+// ─── GET ALL COMPANIES (global list — any logged-in user) ────────────────
 // GET /api/companies
 const getCompanies = async (req, res) => {
   try {
-    const { page = 1, limit = 12, domain, search, driveStatus, sort = "-createdAt" } = req.query;
-    const skip = (parseInt(page) - 1) * parseInt(limit);
-
+    const { page = 1, limit = 12, industry, search, sort = "name" } = req.query;
+    const skip   = (parseInt(page) - 1) * parseInt(limit);
     const filter = { isActive: true };
-    if (domain)      filter.domain      = domain;
-    if (driveStatus) filter.driveStatus = driveStatus;
-    if (search)      filter.$text       = { $search: search };
+
+    if (industry) filter.industry = industry;
+    if (search)   filter.$text    = { $search: search };
 
     const [companies, total] = await Promise.all([
       Company.find(filter).sort(sort).skip(skip).limit(parseInt(limit)).select("-__v"),
@@ -22,7 +22,7 @@ const getCompanies = async (req, res) => {
     return successResponse(res, 200, "Companies fetched", {
       companies,
       total,
-      page: parseInt(page),
+      page:       parseInt(page),
       totalPages: Math.ceil(total / parseInt(limit)),
     });
   } catch (err) {
@@ -34,7 +34,8 @@ const getCompanies = async (req, res) => {
 // GET /api/companies/:id
 const getCompany = async (req, res) => {
   try {
-    const company = await Company.findById(req.params.id).populate("addedBy", "name");
+    const company = await Company.findById(req.params.id)
+      .populate("addedBy", "name");
     if (!company) return errorResponse(res, 404, "Company not found");
     return successResponse(res, 200, "Company fetched", company);
   } catch (err) {
@@ -50,10 +51,10 @@ const searchCompanies = async (req, res) => {
     if (!q) return successResponse(res, 200, "Search results", []);
 
     const companies = await Company.find({
-      name: { $regex: q, $options: "i" },
+      name:     { $regex: q, $options: "i" },
       isActive: true,
     })
-      .select("name logo domain driveStatus")
+      .select("name logo industry")
       .limit(10);
 
     return successResponse(res, 200, "Search results", companies);
@@ -62,15 +63,11 @@ const searchCompanies = async (req, res) => {
   }
 };
 
-// ─── CREATE COMPANY ───────────────────────────────────────────────────────
-// POST /api/companies  (officer/admin only)
+// ─── CREATE COMPANY (officer/admin — adds to global list) ─────────────────
+// POST /api/companies
 const createCompany = async (req, res) => {
   try {
-    const {
-      name, website, domain, description, headquarters,
-      rounds, skillsRequired, minCGPA, eligibleBranches,
-      upcomingDriveDate, driveStatus,
-    } = req.body;
+    const { name, website, industry, description, headquarters } = req.body;
 
     if (!name) return errorResponse(res, 400, "Company name is required");
 
@@ -78,13 +75,7 @@ const createCompany = async (req, res) => {
     if (exists) return errorResponse(res, 400, "Company with this name already exists");
 
     const company = await Company.create({
-      name, website, domain, description, headquarters,
-      rounds: rounds || [],
-      skillsRequired: skillsRequired || [],
-      minCGPA: minCGPA || 0,
-      eligibleBranches: eligibleBranches || [],
-      upcomingDriveDate,
-      driveStatus: driveStatus || "none",
+      name, website, industry, description, headquarters,
       addedBy: req.user._id,
     });
 
@@ -94,8 +85,8 @@ const createCompany = async (req, res) => {
   }
 };
 
-// ─── UPDATE COMPANY ───────────────────────────────────────────────────────
-// PUT /api/companies/:id  (officer/admin only)
+// ─── UPDATE COMPANY (officer/admin) ──────────────────────────────────────
+// PUT /api/companies/:id
 const updateCompany = async (req, res) => {
   try {
     const company = await Company.findByIdAndUpdate(req.params.id, req.body, {
@@ -109,8 +100,8 @@ const updateCompany = async (req, res) => {
   }
 };
 
-// ─── DELETE COMPANY ───────────────────────────────────────────────────────
-// DELETE /api/companies/:id  (admin only)
+// ─── DELETE COMPANY (superAdmin/collegeAdmin only) ────────────────────────
+// DELETE /api/companies/:id
 const deleteCompany = async (req, res) => {
   try {
     const company = await Company.findByIdAndDelete(req.params.id);
@@ -122,7 +113,7 @@ const deleteCompany = async (req, res) => {
 };
 
 // ─── UPLOAD LOGO ──────────────────────────────────────────────────────────
-// POST /api/companies/:id/logo  (officer/admin only)
+// POST /api/companies/:id/logo
 const uploadLogo = async (req, res) => {
   try {
     if (!req.file) return errorResponse(res, 400, "No image provided");
@@ -131,12 +122,12 @@ const uploadLogo = async (req, res) => {
     if (!company) return errorResponse(res, 404, "Company not found");
 
     if (company.logoPublicId) {
-      await deleteFromCloudinary(company.logoPublicId);
+      await deleteFromCloudinary(company.logoPublicId).catch(() => {});
     }
 
     const result = await uploadToCloudinary(req.file.buffer, "hireloop/company-logos", "image");
-    company.logo = result.secure_url;
-    company.logoPublicId = result.public_id;
+    company.logo          = result.secure_url;
+    company.logoPublicId  = result.public_id;
     await company.save();
 
     return successResponse(res, 200, "Logo uploaded", { logo: result.secure_url });
@@ -145,29 +136,19 @@ const uploadLogo = async (req, res) => {
   }
 };
 
-// ─── RATE COMPANY DIFFICULTY ──────────────────────────────────────────────
-// POST /api/companies/:id/rate
-const rateCompany = async (req, res) => {
+// ─── GET DRIVES FOR A COMPANY (tenant-scoped) ────────────────────────────
+// GET /api/companies/:id/drives
+const getCompanyDrives = async (req, res) => {
   try {
-    const { rating } = req.body;
-    if (!rating || rating < 1 || rating > 5)
-      return errorResponse(res, 400, "Rating must be between 1 and 5");
+    const drives = await PlacementDrive.find({
+      company:     req.params.id,
+      institution: req.institutionId,
+    })
+      .populate("company", "name logo")
+      .sort({ driveDate: -1 })
+      .limit(20);
 
-    const company = await Company.findById(req.params.id);
-    if (!company) return errorResponse(res, 404, "Company not found");
-
-    // Simple rolling average
-    const newTotal = company.totalRatings + 1;
-    const newAvg   = ((company.difficultyRating * company.totalRatings) + rating) / newTotal;
-
-    company.difficultyRating = Math.round(newAvg * 10) / 10;
-    company.totalRatings     = newTotal;
-    await company.save();
-
-    return successResponse(res, 200, "Rating submitted", {
-      difficultyRating: company.difficultyRating,
-      totalRatings: company.totalRatings,
-    });
+    return successResponse(res, 200, "Company drives fetched", drives);
   } catch (err) {
     return errorResponse(res, 500, err.message);
   }
@@ -176,5 +157,5 @@ const rateCompany = async (req, res) => {
 module.exports = {
   getCompanies, getCompany, searchCompanies,
   createCompany, updateCompany, deleteCompany,
-  uploadLogo, rateCompany,
+  uploadLogo, getCompanyDrives,
 };

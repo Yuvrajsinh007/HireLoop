@@ -1,7 +1,9 @@
 const crypto = require("crypto");
 const bcrypt = require("bcryptjs");
-const User    = require("../models/User");
-const Student = require("../models/Student");
+const User              = require("../models/User");
+const MemberProfile     = require("../models/MemberProfile");
+const Institution       = require("../models/Institution");
+const InstitutionDomain = require("../models/InstitutionDomain");
 const { generateToken } = require("../utils/generateToken");
 const {
   sendWelcomeEmail,
@@ -12,77 +14,114 @@ const {
 const { successResponse, errorResponse } = require("../utils/apiResponse");
 
 // ─── HELPERS ──────────────────────────────────────────────────────────────
+const generateOtp     = () => crypto.randomInt(100000, 999999).toString();
+const hashOtp         = async (otp) => bcrypt.hash(otp, 10);
+const compareOtp      = async (otp, hash) => bcrypt.compare(otp, hash);
+const isOnCooldown    = (last) => last && (Date.now() - new Date(last).getTime()) / 1000 < 60;
+const cooldownLeft    = (last) => Math.max(0, Math.ceil(60 - (Date.now() - new Date(last).getTime()) / 1000));
 
-/** Generate a secure 6-digit numeric OTP */
-const generateOtp = () => {
-  return crypto.randomInt(100000, 999999).toString();
-};
+/** Extract domain from email, e.g. "foo@bar.edu.in" → "bar.edu.in" */
+const getDomain = (email) => email.split("@")[1]?.toLowerCase().trim();
 
-/** Hash OTP before storing */
-const hashOtp = async (otp) => {
-  return await bcrypt.hash(otp, 10);
-};
-
-/** Compare plain OTP with stored hash */
-const compareOtp = async (otp, hash) => {
-  return await bcrypt.compare(otp, hash);
-};
-
-/** Check OTP resend cooldown (60 seconds) */
-const isOnCooldown = (lastSentAt) => {
-  if (!lastSentAt) return false;
-  const diff = (Date.now() - new Date(lastSentAt).getTime()) / 1000;
-  return diff < 60;
-};
-
-/** Seconds remaining on cooldown */
-const cooldownRemaining = (lastSentAt) => {
-  if (!lastSentAt) return 0;
-  const diff = Math.ceil(60 - (Date.now() - new Date(lastSentAt).getTime()) / 1000);
-  return Math.max(0, diff);
-};
+/** Build safe user payload for JWT response */
+const buildUserPayload = (user) => ({
+  _id:             user._id,
+  name:            user.name,
+  email:           user.email,
+  role:            user.role,
+  institution:     user.institution,
+  academicStatus:  user.academicStatus,
+  placementStatus: user.placementStatus,
+  employmentStatus:user.employmentStatus,
+  isEmailVerified: user.isEmailVerified,
+  avatar:          user.avatar,
+});
 
 // ─── REGISTER ──────────────────────────────────────────────────────────────
 // POST /api/auth/register
+// Members (students/alumni) register with their institutional email
+// The institution is auto-detected from the email domain
 const register = async (req, res) => {
   try {
-    const { name, email, password, role } = req.body;
+    const { name, email, password, registrationIntent } = req.body;
+    // registrationIntent: "student" | "alumni"
 
     if (!name || !email || !password)
-      return errorResponse(res, 400, "Name, email and password are required");
+      return errorResponse(res, 400, "Name, email, and password are required");
 
     const existingUser = await User.findOne({ email });
     if (existingUser)
       return errorResponse(res, 400, "Email already registered");
 
-    const allowedRoles = ["student", "senior"];
-    const userRole = allowedRoles.includes(role) ? role : "student";
+    const domain = getDomain(email);
+    if (!domain)
+      return errorResponse(res, 400, "Invalid email address");
 
-    const user = await User.create({ name, email, password, role: userRole });
+    // ── Auto-detect institution from email domain ──────────────────────────
+    const domainRecord = await InstitutionDomain.findOne({ domain }).populate("institution");
 
-    if (userRole === "student" || userRole === "senior") {
-      await Student.create({ user: user._id });
+    if (!domainRecord) {
+      return errorResponse(
+        res,
+        400,
+        "Your college is not registered on this platform. Please contact your placement office."
+      );
     }
 
-    // Send welcome email (non-blocking)
+    if (!domainRecord.institution || domainRecord.institution.status !== "active") {
+      return errorResponse(
+        res,
+        403,
+        "Your institution is not currently active on this platform."
+      );
+    }
+
+    const institution = domainRecord.institution;
+    const intent      = registrationIntent === "alumni" ? "alumni" : "student";
+
+    // Check if this domain allows this type of user
+    if (!domainRecord.allowedFor.includes(intent === "alumni" ? "alumni" : "student")) {
+      return errorResponse(
+        res,
+        400,
+        `This email domain does not support ${intent} registration.`
+      );
+    }
+
+    // ── Create user ────────────────────────────────────────────────────────
+    const academicStatus = intent === "alumni" ? "GRADUATED" : "ENROLLED";
+    const employmentStatus = intent === "alumni" ? "WORKING" : "STUDENT";
+    const placementStatus  = intent === "alumni" ? "NOT_APPLICABLE" : "UNPLACED";
+
+    const user = await User.create({
+      name,
+      email,
+      password,
+      role:            "member",
+      institution:     institution._id,
+      academicStatus,
+      placementStatus,
+      employmentStatus,
+    });
+
+    // ── Create MemberProfile ──────────────────────────────────────────────
+    await MemberProfile.create({
+      user:        user._id,
+      institution: institution._id,
+    });
+
+    // ── Send welcome email ─────────────────────────────────────────────────
     try {
       await sendWelcomeEmail({ to: email, name });
-    } catch (emailErr) {
-      console.error("Welcome email error (ignored):", emailErr.message);
+    } catch (e) {
+      console.error("Welcome email error (ignored):", e.message);
     }
 
     const token = generateToken(user._id, user.role);
 
-    return successResponse(res, 201, "Registration successful! You can now use HireLoop.", {
+    return successResponse(res, 201, "Registration successful! Welcome to HireLoop.", {
       token,
-      user: {
-        _id: user._id,
-        name: user.name,
-        email: user.email,
-        role: user.role,
-        isEmailVerified: user.isEmailVerified,
-        avatar: user.avatar,
-      },
+      user: buildUserPayload(user),
     });
   } catch (error) {
     console.error("Registration error:", error);
@@ -99,12 +138,19 @@ const login = async (req, res) => {
     if (!email || !password)
       return errorResponse(res, 400, "Email and password are required");
 
-    const user = await User.findOne({ email }).select("+password");
+    const user = await User.findOne({ email })
+      .select("+password")
+      .populate("institution", "_id name status");
+
     if (!user)
       return errorResponse(res, 401, "Invalid email or password");
 
     if (!user.isActive)
       return errorResponse(res, 401, "Your account has been deactivated. Contact admin.");
+
+    if (user.role !== "superAdmin" && user.institution?.status !== "active") {
+      return errorResponse(res, 403, "Your institution is not active on this platform.");
+    }
 
     const isMatch = await user.matchPassword(password);
     if (!isMatch)
@@ -117,14 +163,7 @@ const login = async (req, res) => {
 
     return successResponse(res, 200, "Login successful", {
       token,
-      user: {
-        _id: user._id,
-        name: user.name,
-        email: user.email,
-        role: user.role,
-        isEmailVerified: user.isEmailVerified,
-        avatar: user.avatar,
-      },
+      user: buildUserPayload(user),
     });
   } catch (error) {
     console.error("Login error:", error);
@@ -139,37 +178,40 @@ const sendLoginOtp = async (req, res) => {
     const { email } = req.body;
     if (!email) return errorResponse(res, 400, "Email is required");
 
-    const user = await User.findOne({ email }).select("+lastOtpSentAt +loginOtp +loginOtpExpire");
-    // Generic response to prevent email enumeration
+    const user = await User.findOne({ email })
+      .select("+lastOtpSentAt +loginOtp +loginOtpExpire +loginOtpAttempts")
+      .populate("institution", "status");
+
     if (!user)
       return successResponse(res, 200, "If this email is registered, an OTP has been sent.");
 
     if (!user.isActive)
       return errorResponse(res, 401, "Your account has been deactivated.");
 
-    if (isOnCooldown(user.lastOtpSentAt)) {
-      return errorResponse(res, 429, `Please wait ${cooldownRemaining(user.lastOtpSentAt)} seconds before requesting another OTP.`);
-    }
+    if (user.role !== "superAdmin" && user.institution?.status !== "active")
+      return errorResponse(res, 403, "Your institution is not active.");
+
+    if (isOnCooldown(user.lastOtpSentAt))
+      return errorResponse(res, 429, `Please wait ${cooldownLeft(user.lastOtpSentAt)} seconds before requesting another OTP.`);
 
     const otp    = generateOtp();
     const hashed = await hashOtp(otp);
 
     user.loginOtp         = hashed;
-    user.loginOtpExpire   = new Date(Date.now() + 10 * 60 * 1000); // 10 mins
+    user.loginOtpExpire   = new Date(Date.now() + 10 * 60 * 1000);
     user.loginOtpAttempts = 0;
     user.lastOtpSentAt    = new Date();
     await user.save({ validateBeforeSave: false });
 
     try {
       await sendLoginOtpEmail({ to: email, name: user.name, otp });
-    } catch (emailErr) {
-      console.error("Login OTP email error:", emailErr.message);
+    } catch (e) {
+      console.error("Login OTP email error:", e.message);
       return errorResponse(res, 500, "Could not send OTP email. Try again.");
     }
 
     return successResponse(res, 200, "OTP sent to your email. Valid for 10 minutes.");
   } catch (error) {
-    console.error("Send login OTP error:", error);
     return errorResponse(res, 500, error.message);
   }
 };
@@ -181,17 +223,15 @@ const verifyLoginOtp = async (req, res) => {
     const { email, otp } = req.body;
     if (!email || !otp) return errorResponse(res, 400, "Email and OTP are required");
 
-    const user = await User.findOne({ email }).select(
-      "+loginOtp +loginOtpExpire +loginOtpAttempts +isActive"
-    );
+    const user = await User.findOne({ email })
+      .select("+loginOtp +loginOtpExpire +loginOtpAttempts +isActive")
+      .populate("institution", "_id name status");
 
     if (!user) return errorResponse(res, 401, "Invalid OTP");
     if (!user.isActive) return errorResponse(res, 401, "Account deactivated.");
 
-    // Max 5 attempts
     if (user.loginOtpAttempts >= 5) {
-      user.loginOtp         = undefined;
-      user.loginOtpExpire   = undefined;
+      user.loginOtp = user.loginOtpExpire = undefined;
       user.loginOtpAttempts = 0;
       await user.save({ validateBeforeSave: false });
       return errorResponse(res, 429, "Too many failed attempts. Please request a new OTP.");
@@ -201,8 +241,7 @@ const verifyLoginOtp = async (req, res) => {
       return errorResponse(res, 400, "No OTP found. Please request a new one.");
 
     if (new Date() > user.loginOtpExpire) {
-      user.loginOtp         = undefined;
-      user.loginOtpExpire   = undefined;
+      user.loginOtp = user.loginOtpExpire = undefined;
       user.loginOtpAttempts = 0;
       await user.save({ validateBeforeSave: false });
       return errorResponse(res, 400, "OTP has expired. Please request a new one.");
@@ -215,48 +254,34 @@ const verifyLoginOtp = async (req, res) => {
       return errorResponse(res, 401, `Invalid OTP. ${5 - user.loginOtpAttempts} attempts remaining.`);
     }
 
-    // OTP valid — clear it
-    user.loginOtp         = undefined;
-    user.loginOtpExpire   = undefined;
+    user.loginOtp = user.loginOtpExpire = undefined;
     user.loginOtpAttempts = 0;
-    user.lastLogin        = new Date();
+    user.lastLogin = new Date();
     await user.save({ validateBeforeSave: false });
 
     const token = generateToken(user._id, user.role);
 
     return successResponse(res, 200, "Login successful", {
       token,
-      user: {
-        _id: user._id,
-        name: user.name,
-        email: user.email,
-        role: user.role,
-        isEmailVerified: user.isEmailVerified,
-        avatar: user.avatar,
-      },
+      user: buildUserPayload(user),
     });
   } catch (error) {
-    console.error("Verify login OTP error:", error);
     return errorResponse(res, 500, error.message);
   }
 };
 
 // ─── SEND EMAIL VERIFY OTP ─────────────────────────────────────────────────
-// POST /api/auth/send-verify-otp  (protected — user must be logged in)
+// POST /api/auth/send-verify-otp  (protected)
 const sendVerifyOtp = async (req, res) => {
   try {
-    const user = await User.findById(req.user._id).select(
-      "+emailVerifyOtp +emailVerifyOtpExpire +emailVerifyOtpAttempts +lastOtpSentAt"
-    );
+    const user = await User.findById(req.user._id)
+      .select("+emailVerifyOtp +emailVerifyOtpExpire +emailVerifyOtpAttempts +lastOtpSentAt");
 
     if (!user) return errorResponse(res, 404, "User not found");
+    if (user.isEmailVerified) return errorResponse(res, 400, "Email is already verified.");
 
-    if (user.isEmailVerified)
-      return errorResponse(res, 400, "Email is already verified.");
-
-    if (isOnCooldown(user.lastOtpSentAt)) {
-      return errorResponse(res, 429, `Please wait ${cooldownRemaining(user.lastOtpSentAt)} seconds before requesting another OTP.`);
-    }
+    if (isOnCooldown(user.lastOtpSentAt))
+      return errorResponse(res, 429, `Please wait ${cooldownLeft(user.lastOtpSentAt)} seconds before requesting another OTP.`);
 
     const otp    = generateOtp();
     const hashed = await hashOtp(otp);
@@ -269,14 +294,13 @@ const sendVerifyOtp = async (req, res) => {
 
     try {
       await sendVerificationOtpEmail({ to: user.email, name: user.name, otp });
-    } catch (emailErr) {
-      console.error("Verify OTP email error:", emailErr.message);
+    } catch (e) {
+      console.error("Verify OTP email error:", e.message);
       return errorResponse(res, 500, "Could not send OTP email. Try again.");
     }
 
     return successResponse(res, 200, "OTP sent to your email. Valid for 10 minutes.");
   } catch (error) {
-    console.error("Send verify OTP error:", error);
     return errorResponse(res, 500, error.message);
   }
 };
@@ -288,16 +312,14 @@ const verifyEmailOtp = async (req, res) => {
     const { otp } = req.body;
     if (!otp) return errorResponse(res, 400, "OTP is required");
 
-    const user = await User.findById(req.user._id).select(
-      "+emailVerifyOtp +emailVerifyOtpExpire +emailVerifyOtpAttempts"
-    );
+    const user = await User.findById(req.user._id)
+      .select("+emailVerifyOtp +emailVerifyOtpExpire +emailVerifyOtpAttempts");
 
     if (!user) return errorResponse(res, 404, "User not found");
     if (user.isEmailVerified) return errorResponse(res, 400, "Email already verified.");
 
     if (user.emailVerifyOtpAttempts >= 5) {
-      user.emailVerifyOtp         = undefined;
-      user.emailVerifyOtpExpire   = undefined;
+      user.emailVerifyOtp = user.emailVerifyOtpExpire = undefined;
       user.emailVerifyOtpAttempts = 0;
       await user.save({ validateBeforeSave: false });
       return errorResponse(res, 429, "Too many failed attempts. Please request a new OTP.");
@@ -307,8 +329,7 @@ const verifyEmailOtp = async (req, res) => {
       return errorResponse(res, 400, "No OTP found. Please request a new one.");
 
     if (new Date() > user.emailVerifyOtpExpire) {
-      user.emailVerifyOtp         = undefined;
-      user.emailVerifyOtpExpire   = undefined;
+      user.emailVerifyOtp = user.emailVerifyOtpExpire = undefined;
       user.emailVerifyOtpAttempts = 0;
       await user.save({ validateBeforeSave: false });
       return errorResponse(res, 400, "OTP has expired. Please request a new one.");
@@ -321,79 +342,71 @@ const verifyEmailOtp = async (req, res) => {
       return errorResponse(res, 401, `Invalid OTP. ${5 - user.emailVerifyOtpAttempts} attempts remaining.`);
     }
 
-    // OTP valid — mark email as verified
     user.isEmailVerified        = true;
     user.emailVerifyOtp         = undefined;
     user.emailVerifyOtpExpire   = undefined;
     user.emailVerifyOtpAttempts = 0;
     await user.save({ validateBeforeSave: false });
 
-    return successResponse(res, 200, "Email verified successfully! ✅", {
-      isEmailVerified: true,
-    });
+    return successResponse(res, 200, "Email verified successfully! ✅", { isEmailVerified: true });
   } catch (error) {
-    console.error("Verify email OTP error:", error);
     return errorResponse(res, 500, error.message);
   }
 };
 
-// ─── FORGOT PASSWORD — SEND OTP ───────────────────────────────────────────
+// ─── FORGOT PASSWORD ───────────────────────────────────────────────────────
 // POST /api/auth/forgot-password
 const forgotPassword = async (req, res) => {
   try {
     const { email } = req.body;
     if (!email) return errorResponse(res, 400, "Email is required");
 
-    const user = await User.findOne({ email }).select("+lastOtpSentAt +resetOtp +resetOtpExpire");
+    const user = await User.findOne({ email })
+      .select("+lastOtpSentAt +resetOtp +resetOtpExpire");
 
-    // Generic response
     if (!user)
       return successResponse(res, 200, "If this email is registered, an OTP has been sent.");
 
-    if (isOnCooldown(user.lastOtpSentAt)) {
-      return errorResponse(res, 429, `Please wait ${cooldownRemaining(user.lastOtpSentAt)} seconds before requesting another OTP.`);
-    }
+    if (isOnCooldown(user.lastOtpSentAt))
+      return errorResponse(res, 429, `Please wait ${cooldownLeft(user.lastOtpSentAt)} seconds.`);
 
     const otp    = generateOtp();
     const hashed = await hashOtp(otp);
 
-    user.resetOtp          = hashed;
-    user.resetOtpExpire    = new Date(Date.now() + 10 * 60 * 1000);
-    user.resetOtpAttempts  = 0;
-    user.resetOtpVerified  = false;
-    user.lastOtpSentAt     = new Date();
+    user.resetOtp         = hashed;
+    user.resetOtpExpire   = new Date(Date.now() + 10 * 60 * 1000);
+    user.resetOtpAttempts = 0;
+    user.resetOtpVerified = false;
+    user.lastOtpSentAt    = new Date();
     await user.save({ validateBeforeSave: false });
 
     try {
       await sendPasswordResetOtpEmail({ to: email, name: user.name, otp });
-    } catch (emailErr) {
-      console.error("Reset OTP email error:", emailErr.message);
+    } catch (e) {
+      console.error("Reset OTP email error:", e.message);
       return errorResponse(res, 500, "Could not send OTP email. Try again.");
     }
 
     return successResponse(res, 200, "OTP sent to your email. Valid for 10 minutes.");
   } catch (error) {
-    console.error("Forgot password error:", error);
     return errorResponse(res, 500, error.message);
   }
 };
 
-// ─── FORGOT PASSWORD — VERIFY OTP ─────────────────────────────────────────
+// ─── VERIFY RESET OTP ──────────────────────────────────────────────────────
 // POST /api/auth/verify-reset-otp
 const verifyResetOtp = async (req, res) => {
   try {
     const { email, otp } = req.body;
     if (!email || !otp) return errorResponse(res, 400, "Email and OTP are required");
 
-    const user = await User.findOne({ email }).select(
-      "+resetOtp +resetOtpExpire +resetOtpAttempts +resetOtpVerified"
-    );
+    const user = await User.findOne({ email })
+      .select("+resetOtp +resetOtpExpire +resetOtpAttempts +resetOtpVerified");
 
     if (!user) return errorResponse(res, 400, "Invalid OTP");
 
     if (user.resetOtpAttempts >= 5) {
-      user.resetOtp         = undefined;
-      user.resetOtpExpire   = undefined;
+      user.resetOtp = user.resetOtpExpire = undefined;
       user.resetOtpAttempts = 0;
       user.resetOtpVerified = false;
       await user.save({ validateBeforeSave: false });
@@ -404,8 +417,7 @@ const verifyResetOtp = async (req, res) => {
       return errorResponse(res, 400, "No OTP found. Please request a new one.");
 
     if (new Date() > user.resetOtpExpire) {
-      user.resetOtp         = undefined;
-      user.resetOtpExpire   = undefined;
+      user.resetOtp = user.resetOtpExpire = undefined;
       user.resetOtpAttempts = 0;
       user.resetOtpVerified = false;
       await user.save({ validateBeforeSave: false });
@@ -419,26 +431,24 @@ const verifyResetOtp = async (req, res) => {
       return errorResponse(res, 401, `Invalid OTP. ${5 - user.resetOtpAttempts} attempts remaining.`);
     }
 
-    // OTP verified — allow password reset, but don't clear OTP yet (need email in next step)
-    user.resetOtpVerified  = true;
-    user.resetOtpAttempts  = 0;
+    user.resetOtpVerified = true;
+    user.resetOtpAttempts = 0;
     await user.save({ validateBeforeSave: false });
 
     return successResponse(res, 200, "OTP verified. You can now set a new password.");
   } catch (error) {
-    console.error("Verify reset OTP error:", error);
     return errorResponse(res, 500, error.message);
   }
 };
 
-// ─── FORGOT PASSWORD — RESET PASSWORD ─────────────────────────────────────
+// ─── RESET PASSWORD ────────────────────────────────────────────────────────
 // POST /api/auth/reset-password
 const resetPassword = async (req, res) => {
   try {
     const { email, newPassword, confirmPassword } = req.body;
 
     if (!email || !newPassword || !confirmPassword)
-      return errorResponse(res, 400, "Email, new password and confirm password are required");
+      return errorResponse(res, 400, "Email, new password, and confirm password are required");
 
     if (newPassword !== confirmPassword)
       return errorResponse(res, 400, "Passwords do not match");
@@ -446,9 +456,8 @@ const resetPassword = async (req, res) => {
     if (newPassword.length < 6)
       return errorResponse(res, 400, "Password must be at least 6 characters");
 
-    const user = await User.findOne({ email }).select(
-      "+resetOtp +resetOtpExpire +resetOtpVerified"
-    );
+    const user = await User.findOne({ email })
+      .select("+resetOtp +resetOtpExpire +resetOtpVerified");
 
     if (!user) return errorResponse(res, 400, "Invalid request");
 
@@ -458,7 +467,6 @@ const resetPassword = async (req, res) => {
     if (!user.resetOtpExpire || new Date() > user.resetOtpExpire)
       return errorResponse(res, 400, "Session expired. Please start again.");
 
-    // Set new password and clear all reset OTP data
     user.password         = newPassword;
     user.resetOtp         = undefined;
     user.resetOtpExpire   = undefined;
@@ -468,7 +476,6 @@ const resetPassword = async (req, res) => {
 
     return successResponse(res, 200, "Password reset successfully. Please log in with your new password.");
   } catch (error) {
-    console.error("Reset password error:", error);
     return errorResponse(res, 500, error.message);
   }
 };
@@ -477,19 +484,12 @@ const resetPassword = async (req, res) => {
 // GET /api/auth/me  (protected)
 const getMe = async (req, res) => {
   try {
-    const user = await User.findById(req.user._id);
+    const user = await User.findById(req.user._id)
+      .populate("institution", "_id name shortName status logo");
+
     if (!user) return errorResponse(res, 404, "User not found");
 
-    return successResponse(res, 200, "User fetched successfully", {
-      _id: user._id,
-      name: user.name,
-      email: user.email,
-      role: user.role,
-      avatar: user.avatar,
-      isEmailVerified: user.isEmailVerified,
-      lastLogin: user.lastLogin,
-      createdAt: user.createdAt,
-    });
+    return successResponse(res, 200, "User fetched successfully", buildUserPayload(user));
   } catch (error) {
     return errorResponse(res, 500, error.message);
   }

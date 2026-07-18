@@ -1,18 +1,9 @@
 const mongoose = require("mongoose");
 
 const roundDetailSchema = new mongoose.Schema({
-  roundName: {
-    type: String,
-    required: true,
-  },
-  description: {
-    type: String,
-    default: "",
-  },
-  questionsAsked: {
-    type: [String],
-    default: [],
-  },
+  roundName: { type: String, required: true },
+  description: { type: String, default: "" },
+  questionsAsked: { type: [String], default: [] },
   difficulty: {
     type: String,
     enum: ["Easy", "Medium", "Hard"],
@@ -27,6 +18,13 @@ const roundDetailSchema = new mongoose.Schema({
 
 const experienceSchema = new mongoose.Schema(
   {
+    // ─── Tenant ───────────────────────────────────────────────────────────
+    institution: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Institution",
+      required: true,
+    },
+
     author: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "User",
@@ -37,6 +35,7 @@ const experienceSchema = new mongoose.Schema(
       ref: "Company",
       required: true,
     },
+
     role: {
       type: String,
       required: [true, "Role is required"],
@@ -46,23 +45,16 @@ const experienceSchema = new mongoose.Schema(
       type: Number,
       required: [true, "Year is required"],
     },
-    batch: {
-      type: Number, // graduation year
-      default: null,
-    },
-    branch: {
-      type: String,
-      default: "",
-    },
+    batch: { type: Number, default: null },
+    branch: { type: String, default: "" },
+
     outcome: {
       type: String,
       enum: ["Selected", "Rejected", "On Hold", "Withdrew"],
       required: true,
     },
-    ctc: {
-      type: Number, // in LPA, visible only if selected
-      default: null,
-    },
+    ctc: { type: Number, default: null },
+
     overallDifficulty: {
       type: String,
       enum: ["Easy", "Medium", "Hard"],
@@ -80,35 +72,27 @@ const experienceSchema = new mongoose.Schema(
       default: "",
       maxlength: [1000, "Tips cannot exceed 1000 characters"],
     },
-    resourcesUsed: {
-      type: [String], // e.g. ["LeetCode", "GFG", "Striver DSA"]
-      default: [],
+    resourcesUsed: { type: [String], default: [] },
+
+    upvotes: [{ type: mongoose.Schema.Types.ObjectId, ref: "User" }],
+    upvoteCount: { type: Number, default: 0 },
+
+    // ─── Moderation ───────────────────────────────────────────────────────
+    // Officer must approve before it is visible to others in the institution
+    isVerified: { type: Boolean, default: false },
+    verifiedBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+      default: null,
     },
-    upvotes: [
-      {
-        type: mongoose.Schema.Types.ObjectId,
-        ref: "User",
-      },
-    ],
-    upvoteCount: {
-      type: Number,
-      default: 0,
-    },
-    isVerified: {
-      type: Boolean,
-      default: false, // Admin can verify
-    },
-    isAnonymous: {
-      type: Boolean,
-      default: false,
-    },
+    isAnonymous: { type: Boolean, default: false },
   },
   { timestamps: true }
 );
 
-// Index for search and filter
-experienceSchema.index({ company: 1, year: -1 });
-experienceSchema.index({ outcome: 1 });
+experienceSchema.index({ institution: 1, company: 1, year: -1 });
+experienceSchema.index({ institution: 1, outcome: 1 });
+experienceSchema.index({ institution: 1, isVerified: 1 });
 
 const Experience = mongoose.model("Experience", experienceSchema);
 module.exports = Experience;

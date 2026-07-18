@@ -3,12 +3,14 @@ const router  = express.Router();
 const {
   getExperiences, getExperience,
   createExperience, updateExperience, deleteExperience,
-  upvoteExperience, getByCompany, getMyExperiences,
+  upvoteExperience, verifyExperience,
+  getByCompany, getMyExperiences,
 } = require("../controllers/experienceController");
-const { protect }   = require("../middleware/authMiddleware");
-const { authorize } = require("../middleware/roleMiddleware");
+const { protect }        = require("../middleware/authMiddleware");
+const { injectTenant }   = require("../middleware/tenantMiddleware");
+const { authorizeStaff } = require("../middleware/roleMiddleware");
 
-router.use(protect);
+router.use(protect, injectTenant);
 
 router.get("/",                      getExperiences);
 router.get("/my",                    getMyExperiences);
@@ -18,5 +20,6 @@ router.post("/",                     createExperience);
 router.put("/:id",                   updateExperience);
 router.delete("/:id",                deleteExperience);
 router.post("/:id/upvote",           upvoteExperience);
+router.put("/:id/verify",            authorizeStaff, verifyExperience);
 
 module.exports = router;

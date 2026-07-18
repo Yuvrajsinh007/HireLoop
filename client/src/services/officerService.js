@@ -1,9 +1,19 @@
 import API from "./api";
 
-export const getOfficerDashboard = ()       => API.get("/officer/dashboard");
-export const getStudents         = (params) => API.get("/officer/students", { params });
-export const sendDriveAlert      = (data)   => API.post("/officer/send-drive-alert", data);
-export const getPlacementReport  = (params) => API.get("/officer/reports", { params });
-export const getAllUsers          = (params) => API.get("/officer/admin/users", { params });
-export const updateUser          = (id, d)  => API.put(`/officer/admin/users/${id}`, d);
-export const verifyExperience    = (id)     => API.put(`/officer/admin/experiences/${id}/verify`);
+// ─── Dashboard ─────────────────────────────────────────────────────────────
+export const getOfficerDashboard  = ()           => API.get("/officer/dashboard");
+
+// ─── Members ───────────────────────────────────────────────────────────────
+export const getMembers           = (params)     => API.get("/officer/members", { params });
+export const getMember            = (userId)     => API.get(`/officer/members/${userId}`);
+export const updateMemberStatus   = (userId, d)  => API.put(`/officer/members/${userId}/status`, d);
+
+// ─── Batch Graduation ──────────────────────────────────────────────────────
+export const graduateBatch        = (data)       => API.post("/officer/graduate-batch", data);
+
+// ─── Reports ───────────────────────────────────────────────────────────────
+export const getPlacementReport   = (params)     => API.get("/officer/reports", { params });
+
+// ─── Staff ─────────────────────────────────────────────────────────────────
+export const getStaff             = ()           => API.get("/officer/staff");
+export const updateUser           = (id, data)   => API.put(`/officer/users/${id}`, data);

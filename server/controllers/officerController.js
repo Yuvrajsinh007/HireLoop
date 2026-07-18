@@ -1,46 +1,88 @@
-const User        = require("../models/User");
-const Student     = require("../models/Student");
-const Application = require("../models/Application");
-const Company     = require("../models/Company");
-const Experience  = require("../models/Experience");
-const Notification= require("../models/Notification");
-const { sendPlacementAlertEmail } = require("../utils/sendEmail");
+const User           = require("../models/User");
+const MemberProfile  = require("../models/MemberProfile");
+const Application    = require("../models/Application");
+const Company        = require("../models/Company");
+const Experience     = require("../models/Experience");
+const PlacementDrive = require("../models/PlacementDrive");
+const GuidanceRequest= require("../models/GuidanceRequest");
 const { successResponse, errorResponse } = require("../utils/apiResponse");
+const { tenantFilter } = require("../middleware/tenantMiddleware");
 
 // ─── OFFICER DASHBOARD STATS ──────────────────────────────────────────────
 // GET /api/officer/dashboard
 const getDashboard = async (req, res) => {
   try {
+    const tFilter = { institution: req.institutionId };
+
     const [
-      totalStudents, placedStudents,
-      totalCompanies, upcomingDrives,
-      totalExperiences, recentApplications,
+      totalMembers,
+      currentStudents,
+      placedStudents,
+      alumni,
+      totalDrives,
+      activeDrives,
+      totalExperiences,
+      pendingGuidance,
     ] = await Promise.all([
-      Student.countDocuments(),
-      Student.countDocuments({ placementStatus: "placed" }),
-      Company.countDocuments({ isActive: true }),
-      Company.countDocuments({ driveStatus: "upcoming" }),
-      Experience.countDocuments(),
-      Application.find({ currentStage: { $in: ["Offer Received", "Joined"] } })
-        .populate("student", "user")
-        .populate("company", "name")
-        .sort({ updatedAt: -1 })
-        .limit(10),
+      User.countDocuments({ ...tFilter, role: "member", isActive: true }),
+      User.countDocuments({ ...tFilter, role: "member", academicStatus: { $in: ["ENROLLED","FINAL_YEAR"] } }),
+      User.countDocuments({ ...tFilter, role: "member", placementStatus: "PLACED" }),
+      User.countDocuments({ ...tFilter, role: "member", academicStatus: "GRADUATED" }),
+      PlacementDrive.countDocuments(tFilter),
+      PlacementDrive.countDocuments({ ...tFilter, status: { $in: ["UPCOMING","ACTIVE"] } }),
+      Experience.countDocuments({ ...tFilter, isVerified: true }),
+      GuidanceRequest.countDocuments({ ...tFilter, status: "PENDING_REVIEW" }),
     ]);
 
-    // Branch-wise placement stats
-    const branchStats = await Student.aggregate([
+    const placementRate = currentStudents > 0
+      ? Math.round((placedStudents / currentStudents) * 100)
+      : 0;
+
+    // Program-wise placement stats
+    const programStats = await MemberProfile.aggregate([
+      { $match: { institution: req.institutionId } },
+      {
+        $lookup: {
+          from:         "users",
+          localField:   "user",
+          foreignField: "_id",
+          as:           "userInfo",
+        },
+      },
+      { $unwind: "$userInfo" },
+      {
+        $match: {
+          "userInfo.role":           "member",
+          "userInfo.academicStatus": { $in: ["ENROLLED","FINAL_YEAR"] },
+        },
+      },
       {
         $group: {
-          _id:   "$branch",
-          total: { $sum: 1 },
+          _id:    "$program",
+          total:  { $sum: 1 },
           placed: {
-            $sum: { $cond: [{ $eq: ["$placementStatus", "placed"] }, 1, 0] },
+            $sum: {
+              $cond: [{ $eq: ["$userInfo.placementStatus", "PLACED"] }, 1, 0],
+            },
           },
         },
       },
       { $sort: { total: -1 } },
     ]);
+
+    // Populate program names
+    const Program = require("../models/Program");
+    const programIds = programStats.map((p) => p._id).filter(Boolean);
+    const programs   = await Program.find({ _id: { $in: programIds } }).select("name code");
+    const programMap = {};
+    programs.forEach((p) => { programMap[p._id.toString()] = p.name; });
+
+    const programStatsFormatted = programStats.map((p) => ({
+      program: p._id ? programMap[p._id.toString()] || "Unknown" : "Not Set",
+      total:   p.total,
+      placed:  p.placed,
+      rate:    p.total > 0 ? Math.round((p.placed / p.total) * 100) : 0,
+    }));
 
     // Monthly placement trend (last 6 months)
     const sixMonthsAgo = new Date();
@@ -49,8 +91,9 @@ const getDashboard = async (req, res) => {
     const monthlyTrend = await Application.aggregate([
       {
         $match: {
-          currentStage: { $in: ["Offer Received", "Joined"] },
-          updatedAt: { $gte: sixMonthsAgo },
+          institution:  req.institutionId,
+          currentStage: { $in: ["Offer Received","Joined"] },
+          updatedAt:    { $gte: sixMonthsAgo },
         },
       },
       {
@@ -65,48 +108,82 @@ const getDashboard = async (req, res) => {
       { $sort: { "_id.year": 1, "_id.month": 1 } },
     ]);
 
-    const placementRate = totalStudents > 0
-      ? Math.round((placedStudents / totalStudents) * 100)
-      : 0;
+    // Recent placements
+    const recentPlacements = await Application.find({
+      institution:  req.institutionId,
+      currentStage: { $in: ["Offer Received","Joined"] },
+    })
+      .populate("student", "name email avatar")
+      .populate("company", "name logo")
+      .sort({ updatedAt: -1 })
+      .limit(8);
 
     return successResponse(res, 200, "Officer dashboard stats", {
-      totalStudents,
+      totalMembers,
+      currentStudents,
       placedStudents,
+      alumni,
       placementRate,
-      totalCompanies,
-      upcomingDrives,
+      totalDrives,
+      activeDrives,
       totalExperiences,
-      branchStats,
+      pendingGuidance,
+      programStats: programStatsFormatted,
       monthlyTrend,
-      recentPlacements: recentApplications,
+      recentPlacements,
     });
   } catch (err) {
     return errorResponse(res, 500, err.message);
   }
 };
 
-// ─── GET ALL STUDENTS ─────────────────────────────────────────────────────
-// GET /api/officer/students
-const getStudents = async (req, res) => {
+// ─── GET ALL MEMBERS (students + alumni) ──────────────────────────────────
+// GET /api/officer/members
+const getMembers = async (req, res) => {
   try {
-    const { branch, placementStatus, page = 1, limit = 20 } = req.query;
-    const skip   = (parseInt(page) - 1) * parseInt(limit);
-    const filter = {};
-    if (branch)          filter.branch          = branch;
-    if (placementStatus) filter.placementStatus = placementStatus;
+    const {
+      academicStatus, placementStatus, program,
+      academicUnit, graduationYear, search,
+      page = 1, limit = 20,
+    } = req.query;
 
-    const [students, total] = await Promise.all([
-      Student.find(filter)
-        .populate("user", "name email avatar isEmailVerified createdAt")
+    const skip   = (parseInt(page) - 1) * parseInt(limit);
+
+    // Build user filter
+    const userFilter = { institution: req.institutionId, role: "member", isActive: true };
+    if (academicStatus)  userFilter.academicStatus  = academicStatus;
+    if (placementStatus) userFilter.placementStatus = placementStatus;
+    if (search) {
+      userFilter.$or = [
+        { name:  { $regex: search, $options: "i" } },
+        { email: { $regex: search, $options: "i" } },
+      ];
+    }
+
+    const users = await User.find(userFilter).select("_id");
+    const userIds = users.map((u) => u._id);
+
+    // Build profile filter
+    const profileFilter = { user: { $in: userIds }, institution: req.institutionId };
+    if (program)       profileFilter.program       = program;
+    if (academicUnit)  profileFilter.academicUnit  = academicUnit;
+    if (graduationYear) profileFilter.graduationYear = parseInt(graduationYear);
+
+    const [profiles, total] = await Promise.all([
+      MemberProfile.find(profileFilter)
+        .populate("user",         "name email avatar academicStatus placementStatus employmentStatus isEmailVerified createdAt")
+        .populate("program",      "name code degreeType")
+        .populate("academicUnit", "name code")
         .sort({ createdAt: -1 })
         .skip(skip)
         .limit(parseInt(limit)),
-      Student.countDocuments(filter),
+      MemberProfile.countDocuments(profileFilter),
     ]);
 
-    return successResponse(res, 200, "Students fetched", {
-      students, total,
-      page: parseInt(page),
+    return successResponse(res, 200, "Members fetched", {
+      members: profiles,
+      total,
+      page:       parseInt(page),
       totalPages: Math.ceil(total / parseInt(limit)),
     });
   } catch (err) {
@@ -114,92 +191,132 @@ const getStudents = async (req, res) => {
   }
 };
 
-// ─── SEND DRIVE ALERT EMAIL ───────────────────────────────────────────────
-// POST /api/officer/send-drive-alert
-const sendDriveAlert = async (req, res) => {
+// ─── GET SINGLE MEMBER (officer can see full profile) ─────────────────────
+// GET /api/officer/members/:userId
+const getMember = async (req, res) => {
   try {
-    const { companyId, driveDate, branches } = req.body;
-    if (!companyId || !driveDate) {
-      return errorResponse(res, 400, "Company and drive date are required");
-    }
+    const profile = await MemberProfile.findOne({
+      user:        req.params.userId,
+      institution: req.institutionId,
+    })
+      .populate("user",         "name email avatar academicStatus placementStatus employmentStatus isEmailVerified alternateEmail createdAt lastLogin")
+      .populate("program",      "name code degreeType durationYears")
+      .populate("academicUnit", "name code");
 
-    const company = await Company.findById(companyId);
-    if (!company) return errorResponse(res, 404, "Company not found");
+    if (!profile) return errorResponse(res, 404, "Member not found in your institution");
 
-    // Get eligible students
-    const studentFilter = {};
-    if (branches?.length) studentFilter.branch = { $in: branches };
+    const applications = await Application.find({
+      student:     req.params.userId,
+      institution: req.institutionId,
+    })
+      .populate("company", "name logo")
+      .sort({ updatedAt: -1 })
+      .limit(10);
 
-    const students = await Student.find(studentFilter)
-      .populate("user", "name email");
+    return successResponse(res, 200, "Member fetched", { profile, applications });
+  } catch (err) {
+    return errorResponse(res, 500, err.message);
+  }
+};
 
-    let sent = 0;
-    const errors = [];
+// ─── UPDATE MEMBER STATUS (officer can update academic/placement status) ──
+// PUT /api/officer/members/:userId/status
+const updateMemberStatus = async (req, res) => {
+  try {
+    const { academicStatus, placementStatus, employmentStatus } = req.body;
 
-    for (const student of students) {
-      if (!student.user?.email) continue;
-      try {
-        await sendPlacementAlertEmail({
-          to:          student.user.email,
-          name:        student.user.name,
-          companyName: company.name,
-          driveDate:   new Date(driveDate).toDateString(),
-        });
+    // Verify member belongs to same institution
+    const member = await User.findOne({
+      _id:         req.params.userId,
+      institution: req.institutionId,
+      role:        "member",
+    });
+    if (!member) return errorResponse(res, 404, "Member not found in your institution");
 
-        await Notification.create({
-          recipient: student.user._id,
-          type:      "new_drive",
-          title:     `${company.name} is visiting campus!`,
-          message:   `Drive scheduled on ${new Date(driveDate).toDateString()}`,
-          link:      `/companies/${company._id}`,
-          relatedCompany: company._id,
-        });
+    const updates = {};
+    if (academicStatus)  updates.academicStatus  = academicStatus;
+    if (placementStatus) updates.placementStatus = placementStatus;
+    if (employmentStatus) updates.employmentStatus = employmentStatus;
 
-        sent++;
-      } catch (e) {
-        errors.push(student.user.email);
+    const updated = await User.findByIdAndUpdate(
+      req.params.userId,
+      updates,
+      { new: true }
+    ).select("-password");
+
+    return successResponse(res, 200, "Member status updated", updated);
+  } catch (err) {
+    return errorResponse(res, 500, err.message);
+  }
+};
+
+// ─── GRADUATE BATCH (bulk transition students → alumni) ───────────────────
+// POST /api/officer/graduate-batch
+const graduateBatch = async (req, res) => {
+  try {
+    const { graduationYear, programId } = req.body;
+    if (!graduationYear)
+      return errorResponse(res, 400, "Graduation year is required");
+
+    // Find all profiles matching the batch
+    const profileFilter = { institution: req.institutionId, graduationYear: parseInt(graduationYear) };
+    if (programId) profileFilter.program = programId;
+
+    const profiles  = await MemberProfile.find(profileFilter).select("user");
+    const userIds   = profiles.map((p) => p.user);
+
+    if (userIds.length === 0)
+      return errorResponse(res, 404, "No students found for this graduation year");
+
+    // Update their academicStatus to GRADUATED
+    const result = await User.updateMany(
+      {
+        _id:            { $in: userIds },
+        institution:    req.institutionId,
+        role:           "member",
+        academicStatus: { $in: ["ENROLLED","FINAL_YEAR"] },
+      },
+      {
+        academicStatus:  "GRADUATED",
+        employmentStatus: "SEEKING",
       }
-    }
+    );
 
-    return successResponse(res, 200, `Drive alert sent to ${sent} students`, {
-      sent,
-      failed: errors.length,
-      failedEmails: errors,
+    return successResponse(res, 200, `${result.modifiedCount} students graduated successfully`, {
+      graduated: result.modifiedCount,
+      year:      graduationYear,
     });
   } catch (err) {
     return errorResponse(res, 500, err.message);
   }
 };
 
-// ─── GET PLACEMENT REPORT ─────────────────────────────────────────────────
+// ─── PLACEMENT REPORT ─────────────────────────────────────────────────────
 // GET /api/officer/reports
 const getPlacementReport = async (req, res) => {
   try {
     const { year } = req.query;
+    const filter = tenantFilter(req, {});
 
-    const filter = {};
     if (year) {
       const startDate = new Date(`${year}-01-01`);
       const endDate   = new Date(`${parseInt(year) + 1}-01-01`);
-      filter.updatedAt = { $gte: startDate, $lt: endDate };
-      filter.currentStage = { $in: ["Offer Received", "Joined"] };
+      filter.updatedAt     = { $gte: startDate, $lt: endDate };
+      filter.currentStage  = { $in: ["Offer Received","Joined"] };
     }
 
     const placements = await Application.find(filter)
-      .populate({
-        path:     "student",
-        populate: { path: "user", select: "name email" },
-      })
-      .populate("company", "name domain")
+      .populate("student", "name email avatar")
+      .populate("company", "name logo industry")
       .sort({ updatedAt: -1 });
 
     const totalPlaced = placements.length;
     const avgCTC = placements.reduce((acc, p) => acc + (p.ctcOffered || 0), 0) / (totalPlaced || 1);
-    const maxCTC = Math.max(...placements.map((p) => p.ctcOffered || 0));
+    const maxCTC = Math.max(0, ...placements.map((p) => p.ctcOffered || 0));
 
     const companyBreakdown = placements.reduce((acc, p) => {
-      const name = p.company?.name || "Unknown";
-      acc[name]  = (acc[name] || 0) + 1;
+      const name  = p.company?.name || "Unknown";
+      acc[name]   = (acc[name] || 0) + 1;
       return acc;
     }, {});
 
@@ -215,69 +332,59 @@ const getPlacementReport = async (req, res) => {
   }
 };
 
-// ─── ADMIN: GET ALL USERS ─────────────────────────────────────────────────
-// GET /api/officer/admin/users
-const getAllUsers = async (req, res) => {
+// ─── GET ALL STAFF (for admin view) ───────────────────────────────────────
+// GET /api/officer/staff
+const getStaff = async (req, res) => {
   try {
-    const { role, page = 1, limit = 20, search } = req.query;
-    const skip   = (parseInt(page) - 1) * parseInt(limit);
-    const filter = {};
-    if (role)   filter.role  = role;
-    if (search) filter.$or   = [
-      { name:  { $regex: search, $options: "i" } },
-      { email: { $regex: search, $options: "i" } },
-    ];
+    const staff = await User.find({
+      institution: req.institutionId,
+      role:        { $in: ["officer","collegeAdmin"] },
+    }).select("-password").sort({ createdAt: -1 });
 
-    const [users, total] = await Promise.all([
-      User.find(filter).select("-password").sort({ createdAt: -1 }).skip(skip).limit(parseInt(limit)),
-      User.countDocuments(filter),
-    ]);
-
-    return successResponse(res, 200, "Users fetched", {
-      users, total,
-      page: parseInt(page),
-      totalPages: Math.ceil(total / parseInt(limit)),
-    });
+    return successResponse(res, 200, "Staff fetched", staff);
   } catch (err) {
     return errorResponse(res, 500, err.message);
   }
 };
 
-// ─── ADMIN: UPDATE USER ROLE / STATUS ────────────────────────────────────
-// PUT /api/officer/admin/users/:id
+// ─── UPDATE ANY USER (admin only within institution) ──────────────────────
+// PUT /api/officer/users/:id
 const updateUser = async (req, res) => {
   try {
-    const { role, isActive } = req.body;
-    const user = await User.findByIdAndUpdate(
+    const { role, isActive, academicStatus, placementStatus } = req.body;
+
+    // Ensure user is in same institution
+    const target = await User.findOne({
+      _id:         req.params.id,
+      institution: req.institutionId,
+    });
+    if (!target) return errorResponse(res, 404, "User not found in your institution");
+
+    // Prevent promoting to superAdmin
+    if (role === "superAdmin")
+      return errorResponse(res, 403, "Cannot assign superAdmin role");
+
+    const updated = await User.findByIdAndUpdate(
       req.params.id,
-      { ...(role !== undefined && { role }), ...(isActive !== undefined && { isActive }) },
+      {
+        ...(role !== undefined            && { role }),
+        ...(isActive !== undefined        && { isActive }),
+        ...(academicStatus !== undefined  && { academicStatus }),
+        ...(placementStatus !== undefined && { placementStatus }),
+      },
       { new: true }
     ).select("-password");
 
-    if (!user) return errorResponse(res, 404, "User not found");
-    return successResponse(res, 200, "User updated", user);
-  } catch (err) {
-    return errorResponse(res, 500, err.message);
-  }
-};
-
-// ─── ADMIN: VERIFY EXPERIENCE ─────────────────────────────────────────────
-// PUT /api/officer/admin/experiences/:id/verify
-const verifyExperience = async (req, res) => {
-  try {
-    const exp = await Experience.findByIdAndUpdate(
-      req.params.id,
-      { isVerified: true },
-      { new: true }
-    );
-    if (!exp) return errorResponse(res, 404, "Experience not found");
-    return successResponse(res, 200, "Experience verified", exp);
+    return successResponse(res, 200, "User updated", updated);
   } catch (err) {
     return errorResponse(res, 500, err.message);
   }
 };
 
 module.exports = {
-  getDashboard, getStudents, sendDriveAlert,
-  getPlacementReport, getAllUsers, updateUser, verifyExperience,
+  getDashboard,
+  getMembers, getMember, updateMemberStatus,
+  graduateBatch,
+  getPlacementReport,
+  getStaff, updateUser,
 };

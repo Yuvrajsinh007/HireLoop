@@ -1,5 +1,5 @@
 const express = require("express");
-const router = express.Router();
+const router  = express.Router();
 const {
   getMyApplications,
   addApplication,
@@ -8,15 +8,16 @@ const {
   deleteApplication,
   getApplication,
 } = require("../controllers/applicationController");
-const { protect } = require("../middleware/authMiddleware");
+const { protect }      = require("../middleware/authMiddleware");
+const { injectTenant } = require("../middleware/tenantMiddleware");
 
-router.use(protect);
+router.use(protect, injectTenant);
 
-router.get("/my",       getMyApplications);
-router.post("/",        addApplication);
-router.get("/:id",      getApplication);
-router.put("/:id",      updateApplication);
-router.put("/:id/stage",updateStage);
-router.delete("/:id",   deleteApplication);
+router.get("/my",        getMyApplications);
+router.post("/",         addApplication);
+router.get("/:id",       getApplication);
+router.put("/:id",       updateApplication);
+router.put("/:id/stage", updateStage);
+router.delete("/:id",    deleteApplication);
 
 module.exports = router;
