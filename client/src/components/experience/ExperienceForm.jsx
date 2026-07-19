@@ -2,7 +2,8 @@ import { useState, useEffect } from "react";
 import toast from "react-hot-toast";
 import { getCompanies } from "../../services/companyService";
 import { createExperience } from "../../services/experienceService";
-import { BRANCHES, DIFFICULTY_LEVELS, EXPERIENCE_OUTCOMES, ROUND_TYPES } from "../../utils/constants";
+import { getAcademicUnits } from "../../services/institutionService";
+import { DIFFICULTY_LEVELS, EXPERIENCE_OUTCOMES, ROUND_TYPES } from "../../utils/constants";
 import { useAuth } from '../../hooks/useAuth';
 import { Check, ClipboardList, Loader2, Send, ArrowRight, ArrowLeft } from "lucide-react";
 
@@ -21,6 +22,7 @@ const DEFAULT_FORM = {
 const ExperienceForm = ({ onSuccess, onCancel }) => {
   const { user } = useAuth();
   const [companies, setCompanies] = useState([]);
+  const [branches, setBranches]   = useState([]);
   const [form, setForm]           = useState(DEFAULT_FORM);
   const [loading, setLoading]     = useState(false);
   const [step, setStep]           = useState(1);
@@ -28,6 +30,9 @@ const ExperienceForm = ({ onSuccess, onCancel }) => {
   useEffect(() => {
     getCompanies({ limit: 100 })
       .then((r) => setCompanies(r.data.data?.companies || []))
+      .catch(() => {});
+    getAcademicUnits()
+      .then((r) => setBranches(r.data.data || []))
       .catch(() => {});
   }, []);
 
@@ -157,7 +162,7 @@ const ExperienceForm = ({ onSuccess, onCancel }) => {
                 <label className="block text-sm font-semibold text-gray-700 mb-1.5">Branch</label>
                 <select name="branch" value={form.branch} onChange={handleChange} className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 transition-all">
                   <option value="">Select branch</option>
-                  {BRANCHES.map((b) => <option key={b} value={b}>{b}</option>)}
+                  {branches.map((b) => <option key={b._id} value={b.name}>{b.name}</option>)}
                 </select>
               </div>
               {form.outcome === "Selected" && (

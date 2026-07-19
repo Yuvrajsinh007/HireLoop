@@ -3,7 +3,7 @@ import { STAGE_COLORS } from "../../utils/constants";
 import { formatDate } from "../../utils/formatDate";
 import StageUpdateModal from "./StageUpdateModal";
 import toast from "react-hot-toast";
-import { deleteApplication } from "../../services/studentService";
+import { deleteApplication } from "../../services/memberService";
 import { MoreVertical, Pencil, Trash2, Lock, ArrowRight, Building2, History } from "lucide-react";
 
 const KanbanCard = ({ application, onUpdated, onDeleted }) => {

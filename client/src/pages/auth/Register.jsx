@@ -40,9 +40,8 @@ const Register = () => {
       const data = res.data.data;
 
       if (!data.found) {
-        return toast.error(
-          "Your institution is not registered on HireLoop. Ask your placement office to register."
-        );
+        toast.error("Your institution is not registered on HireLoop yet.");
+        return;
       }
 
       setInstitution(data.institution);
@@ -141,6 +140,10 @@ const Register = () => {
               <p className="text-center text-sm text-gray-500">
                 Already have an account?{" "}
                 <Link to="/login" className="text-indigo-600 font-medium hover:text-indigo-700">Sign in</Link>
+              </p>
+              <p className="text-center text-sm text-gray-400">
+                Is your college not listed?{" "}
+                <Link to="/register-institution" className="text-indigo-600 font-medium hover:text-indigo-700">Register your college →</Link>
               </p>
             </form>
           )}

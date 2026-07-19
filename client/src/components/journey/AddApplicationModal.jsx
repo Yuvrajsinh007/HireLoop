@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import toast from "react-hot-toast";
 import { getCompanies } from "../../services/companyService";
-import { addApplication } from "../../services/studentService";
+import { addApplication } from "../../services/memberService";
 import { X, Search, Loader2, Building2, Check } from "lucide-react";
 
 const AddApplicationModal = ({ onClose, onAdded }) => {

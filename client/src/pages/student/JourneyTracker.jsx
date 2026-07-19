@@ -1,10 +1,11 @@
 import { useState, useEffect } from "react";
+import { motion, AnimatePresence } from "framer-motion";
 import DashboardLayout from "../../components/common/DashboardLayout";
 import KanbanBoard from "../../components/journey/KanbanBoard";
 import AddApplicationModal from "../../components/journey/AddApplicationModal";
 import StageUpdateModal from "../../components/journey/StageUpdateModal";
 import Loader from "../../components/common/Loader";
-import { getMyApplications, deleteApplication } from "../../services/studentService";
+import { getMyApplications, deleteApplication } from "../../services/memberService"; // Or applicationService depending on your structure
 import { STAGE_COLORS } from "../../utils/constants";
 import { formatDate } from "../../utils/formatDate";
 import toast from "react-hot-toast";
@@ -68,41 +69,60 @@ const JourneyTracker = () => {
   const offers   = applications.filter((a) => OFFER_STAGES.includes(a.currentStage)).length;
   const rejected = applications.filter((a) => REJECTED_STAGES.includes(a.currentStage)).length;
 
+  // Animation variants
+  const containerVariants = {
+    hidden: { opacity: 0 },
+    show: { opacity: 1, transition: { staggerChildren: 0.1 } }
+  };
+  const itemVariants = {
+    hidden: { opacity: 0, y: 20 },
+    show: { opacity: 1, y: 0, transition: { duration: 0.4 } }
+  };
+
   return (
     <DashboardLayout>
-      <div className="max-w-7xl mx-auto animate-in fade-in duration-500">
-
+      <motion.div 
+        variants={containerVariants}
+        initial="hidden"
+        animate="show"
+        className="max-w-7xl mx-auto py-8 px-4 sm:px-6 lg:px-8"
+      >
         {/* Header */}
-        <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 mb-8">
+        <motion.div variants={itemVariants} className="flex flex-col md:flex-row md:items-end justify-between gap-4 mb-8">
           <div>
             <h1 className="text-2xl md:text-3xl font-bold text-gray-900 tracking-tight mb-1.5">My Journey Tracker</h1>
-            <p className="text-sm font-medium text-gray-500">Manage and track every placement application</p>
+            <p className="text-sm font-medium text-gray-500">Manage and track every placement application in real-time</p>
           </div>
           <button 
             onClick={() => setShowAddModal(true)} 
-            className="bg-brand-600 text-white font-medium text-sm px-4 py-2.5 rounded-lg hover:bg-brand-700 transition-colors flex items-center justify-center gap-2 shadow-sm"
+            className="bg-indigo-600 text-white font-medium text-sm px-4 py-2.5 rounded-lg hover:bg-indigo-700 transition-colors flex items-center justify-center gap-2 shadow-sm hover:shadow"
           >
             <Plus className="w-4 h-4" /> Add Application
           </button>
-        </div>
+        </motion.div>
 
         {/* Stats Strip */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-8">
+        <motion.div variants={itemVariants} className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-8">
           {[
             { label: "Total",    value: total,    color: "text-gray-900",  bg: "bg-white border-gray-200"  },
-            { label: "Active",   value: active,   color: "text-brand-700", bg: "bg-brand-50 border-brand-200" },
+            { label: "Active",   value: active,   color: "text-indigo-700", bg: "bg-indigo-50 border-indigo-200" },
             { label: "Offers",   value: offers,   color: "text-emerald-700", bg: "bg-emerald-50 border-emerald-200" },
             { label: "Rejected", value: rejected, color: "text-red-700",   bg: "bg-red-50 border-red-200"   },
           ].map((s) => (
-            <div key={s.label} className={`rounded-xl border p-4 shadow-sm ${s.bg}`}>
-              <p className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">{s.label}</p>
+            <motion.div 
+              key={s.label} 
+              whileHover={{ y: -4 }}
+              transition={{ type: "spring", stiffness: 300 }}
+              className={`rounded-xl border p-5 shadow-sm transition-shadow hover:shadow-md ${s.bg}`}
+            >
+              <p className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">{s.label}</p>
               <p className={`text-3xl font-bold ${s.color}`}>{s.value}</p>
-            </div>
+            </motion.div>
           ))}
-        </div>
+        </motion.div>
 
         {/* Toolbar */}
-        <div className="flex flex-col xl:flex-row items-stretch xl:items-center justify-between gap-4 mb-6 bg-white p-2 rounded-xl border border-gray-100 shadow-sm">
+        <motion.div variants={itemVariants} className="flex flex-col xl:flex-row items-stretch xl:items-center justify-between gap-4 mb-6 bg-white p-3 rounded-xl border border-gray-100 shadow-sm">
           
           <div className="relative flex-1 max-w-md">
             <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">
@@ -113,7 +133,7 @@ const JourneyTracker = () => {
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder="Search company or role..."
-              className="w-full pl-9 pr-4 py-2 bg-gray-50 border border-transparent rounded-lg text-sm focus:outline-none focus:bg-white focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 transition-all"
+              className="w-full pl-9 pr-4 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:outline-none focus:bg-white focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 transition-all"
             />
           </div>
 
@@ -135,7 +155,7 @@ const JourneyTracker = () => {
               <button
                 onClick={() => setView("kanban")}
                 className={`p-1.5 rounded-md transition-all duration-200
-                  ${view === "kanban" ? "bg-white text-brand-600 shadow-sm border border-gray-200" : "text-gray-400 hover:text-gray-900 border border-transparent"}`}
+                  ${view === "kanban" ? "bg-white text-indigo-600 shadow-sm border border-gray-200" : "text-gray-400 hover:text-gray-900 border border-transparent"}`}
                 title="Board View"
               >
                 <LayoutGrid className="w-4 h-4" />
@@ -143,41 +163,53 @@ const JourneyTracker = () => {
               <button
                 onClick={() => setView("list")}
                 className={`p-1.5 rounded-md transition-all duration-200
-                  ${view === "list" ? "bg-white text-brand-600 shadow-sm border border-gray-200" : "text-gray-400 hover:text-gray-900 border border-transparent"}`}
+                  ${view === "list" ? "bg-white text-indigo-600 shadow-sm border border-gray-200" : "text-gray-400 hover:text-gray-900 border border-transparent"}`}
                 title="List View"
               >
                 <ListIcon className="w-4 h-4" />
               </button>
             </div>
           </div>
-        </div>
+        </motion.div>
 
         {/* Content */}
-        {loading ? (
-          <div className="flex items-center justify-center min-h-[40vh]">
-            <Loader />
-          </div>
-        ) : view === "kanban" ? (
-          <KanbanBoard
-            applications={filtered}
-            onUpdated={handleUpdated}
-            onDeleted={handleDeleted}
-          />
-        ) : (
-          <ListView
-            applications={filtered}
-            onUpdated={handleUpdated}
-            onDeleted={handleDeleted}
+        <motion.div variants={itemVariants} className="min-h-[50vh]">
+          {loading ? (
+            <div className="flex items-center justify-center min-h-[40vh]">
+              <Loader text="Fetching your applications..." />
+            </div>
+          ) : view === "kanban" ? (
+            <AnimatePresence mode="wait">
+              <motion.div key="kanban" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+                <KanbanBoard
+                  applications={filtered}
+                  onUpdated={handleUpdated}
+                  onDeleted={handleDeleted}
+                />
+              </motion.div>
+            </AnimatePresence>
+          ) : (
+            <AnimatePresence mode="wait">
+              <motion.div key="list" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+                <ListView
+                  applications={filtered}
+                  onUpdated={handleUpdated}
+                  onDeleted={handleDeleted}
+                />
+              </motion.div>
+            </AnimatePresence>
+          )}
+        </motion.div>
+      </motion.div>
+
+      <AnimatePresence>
+        {showAddModal && (
+          <AddApplicationModal
+            onClose={() => setShowAddModal(false)}
+            onAdded={handleAdded}
           />
         )}
-      </div>
-
-      {showAddModal && (
-        <AddApplicationModal
-          onClose={() => setShowAddModal(false)}
-          onAdded={handleAdded}
-        />
-      )}
+      </AnimatePresence>
     </DashboardLayout>
   );
 };
@@ -188,89 +220,104 @@ const ListView = ({ applications, onUpdated, onDeleted }) => {
 
   if (applications.length === 0) {
     return (
-      <div className="bg-white rounded-2xl border border-gray-100 flex flex-col items-center justify-center py-20 text-gray-400 shadow-sm">
+      <motion.div 
+        initial={{ opacity: 0, scale: 0.95 }}
+        animate={{ opacity: 1, scale: 1 }}
+        className="bg-white rounded-2xl border border-gray-100 flex flex-col items-center justify-center py-20 text-gray-400 shadow-sm"
+      >
         <Inbox className="w-12 h-12 mb-4 opacity-20" />
         <p className="text-sm font-medium text-gray-500">No applications found matching your criteria</p>
-      </div>
+      </motion.div>
     );
   }
 
   return (
     <>
-      <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden animate-in fade-in duration-300">
+      <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse">
             <thead>
-              <tr className="bg-gray-50/50 border-b border-gray-100">
+              <tr className="bg-gray-50 border-b border-gray-100">
                 {["Company","Role","Current Stage","Applied On","CTC","Actions"].map((h) => (
                   <th key={h} className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider whitespace-nowrap">{h}</th>
                 ))}
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
-              {applications.map((app) => (
-                <tr key={app._id} className="hover:bg-gray-50/80 transition-colors group">
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="flex items-center gap-3">
-                      <div className="w-9 h-9 rounded-xl bg-brand-50 border border-brand-100 flex items-center justify-center text-brand-600 font-bold text-sm flex-shrink-0">
-                        {app.company?.name ? app.company.name[0] : <Building2 className="w-4 h-4 stroke-[1.5]" />}
+              <AnimatePresence>
+                {applications.map((app) => (
+                  <motion.tr 
+                    layout
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, x: -20, transition: { duration: 0.2 } }}
+                    key={app._id} 
+                    className="hover:bg-indigo-50/30 transition-colors group"
+                  >
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-xl bg-indigo-50 border border-indigo-100 flex items-center justify-center text-indigo-600 font-bold text-sm flex-shrink-0 shadow-sm">
+                          {app.company?.name ? app.company.name[0].toUpperCase() : <Building2 className="w-4 h-4 stroke-[1.5]" />}
+                        </div>
+                        <span className="text-sm font-bold text-gray-900">{app.company?.name || "Unknown"}</span>
                       </div>
-                      <span className="text-sm font-bold text-gray-900">{app.company?.name || "Unknown"}</span>
-                    </div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-600">{app.role}</td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <span className={`badge text-[10px] uppercase tracking-wider font-bold shadow-sm ${STAGE_COLORS[app.currentStage] || "badge-gray"}`}>
-                      {app.currentStage}
-                    </span>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-500">{formatDate(app.applyDate)}</td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-500">
-                    {app.ctcOffered ? (
-                      <span className="text-emerald-700 bg-emerald-50 px-2 py-1 rounded-md">{app.ctcOffered} LPA</span>
-                    ) : "—"}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                      <button
-                        onClick={() => setStageApp(app)}
-                        className="p-1.5 text-gray-400 hover:text-brand-600 hover:bg-brand-50 rounded-lg transition-colors"
-                        title="Update Stage"
-                      >
-                        <Pencil className="w-4 h-4" />
-                      </button>
-                      <button
-                        onClick={async () => {
-                          if (!window.confirm("Are you sure you want to remove this application?")) return;
-                          try {
-                            await deleteApplication(app._id);
-                            onDeleted(app._id);
-                            toast.success("Application removed");
-                          } catch {
-                            toast.error("Failed to delete application");
-                          }
-                        }}
-                        className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                        title="Delete Application"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-600">{app.role}</td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <span className={`inline-flex items-center px-2.5 py-1 rounded-md text-[10px] uppercase tracking-wider font-bold shadow-sm border ${STAGE_COLORS[app.currentStage] || "bg-gray-50 text-gray-600 border-gray-200"}`}>
+                        {app.currentStage}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-500">{formatDate(app.applyDate)}</td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-500">
+                      {app.ctcOffered ? (
+                        <span className="text-emerald-700 bg-emerald-50 border border-emerald-100 px-2.5 py-1 rounded-md font-semibold">{app.ctcOffered} LPA</span>
+                      ) : "—"}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <button
+                          onClick={() => setStageApp(app)}
+                          className="p-1.5 text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors"
+                          title="Update Stage"
+                        >
+                          <Pencil className="w-4 h-4" />
+                        </button>
+                        <button
+                          onClick={async () => {
+                            if (!window.confirm(`Are you sure you want to remove your application for ${app.company?.name}?`)) return;
+                            try {
+                              await deleteApplication(app._id);
+                              onDeleted(app._id);
+                              toast.success("Application removed");
+                            } catch {
+                              toast.error("Failed to delete application");
+                            }
+                          }}
+                          className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                          title="Delete Application"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
+                    </td>
+                  </motion.tr>
+                ))}
+              </AnimatePresence>
             </tbody>
           </table>
         </div>
       </div>
 
-      {stageApp && (
-        <StageUpdateModal
-          application={stageApp}
-          onClose={() => setStageApp(null)}
-          onUpdated={(updated) => { onUpdated(updated); setStageApp(null); }}
-        />
-      )}
+      <AnimatePresence>
+        {stageApp && (
+          <StageUpdateModal
+            application={stageApp}
+            onClose={() => setStageApp(null)}
+            onUpdated={(updated) => { onUpdated(updated); setStageApp(null); }}
+          />
+        )}
+      </AnimatePresence>
     </>
   );
 };

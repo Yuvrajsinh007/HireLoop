@@ -1,10 +1,20 @@
-import { BRANCHES, DIFFICULTY_LEVELS, EXPERIENCE_OUTCOMES } from "../../utils/constants";
+import { useState, useEffect } from "react";
+import { DIFFICULTY_LEVELS, EXPERIENCE_OUTCOMES } from "../../utils/constants";
+import { getAcademicUnits } from "../../services/institutionService";
 import { X, Filter } from "lucide-react";
 
 const currentYear = new Date().getFullYear();
 const YEARS = Array.from({ length: 6 }, (_, i) => currentYear - i);
 
 const ExperienceFilter = ({ filters, onChange, onClear }) => {
+  const [branches, setBranches] = useState([]);
+
+  useEffect(() => {
+    getAcademicUnits()
+      .then((r) => setBranches(r.data.data || []))
+      .catch(() => {});
+  }, []);
+
   const handleChange = (key, value) => onChange({ ...filters, [key]: value });
   const hasFilters = Object.values(filters).some((v) => v !== "");
 
@@ -40,7 +50,7 @@ const ExperienceFilter = ({ filters, onChange, onClear }) => {
           className="px-4 py-2 bg-gray-50 border border-transparent rounded-lg text-sm font-medium text-gray-700 focus:outline-none focus:bg-white focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 transition-all flex-[2] min-w-[180px]"
         >
           <option value="">All Branches</option>
-          {BRANCHES.map((b) => <option key={b} value={b}>{b}</option>)}
+          {branches.map((b) => <option key={b._id} value={b.name}>{b.name}</option>)}
         </select>
 
         <select

@@ -1,274 +1,285 @@
-import { useState } from "react";
-import { Link, useNavigate, useLocation } from "react-router-dom";
-import toast from "react-hot-toast";
-import { useAuth } from "../../hooks/useAuth";
-import { sendLoginOtp, verifyLoginOtp } from "../../services/authService";
-import OtpInput from "../../components/common/OtpInput";
-import { Eye, EyeOff, Loader2, GraduationCap, KeyRound, Mail } from "lucide-react";
-
-const COOLDOWN = 60;
+import React, { useState, useEffect } from 'react';
+import { Link, useNavigate, useLocation } from 'react-router-dom';
+import { motion, AnimatePresence } from 'framer-motion';
+import { useAuth } from '../../hooks/useAuth';
+import api from '../../services/api'; // Assumes you have an axios instance configured here
+import { toast } from 'react-hot-toast'; // Assuming react-hot-toast is used for notifications, adjust if using custom Toast
 
 const Login = () => {
-  const navigate  = useNavigate();
-  const location  = useLocation();
-  const { login, updateUser } = useAuth();
+  const { login, isAuthenticated, user, updateUser } = useAuth();
+  const navigate = useNavigate();
+  const location = useLocation();
 
-  const from = location.state?.from?.pathname || "/dashboard";
+  // Form State
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [otp, setOtp] = useState('');
+  
+  // Mode State
+  const [isOtpMode, setIsOtpMode] = useState(false);
+  const [otpSent, setOtpSent] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState('');
 
-  // ── Tab state ─────────────────────────────────────────────────────────
-  const [tab, setTab] = useState("password"); // "password" | "otp"
+  // Handle Redirection based on Role/Status
+  useEffect(() => {
+    if (isAuthenticated && user) {
+      const from = location.state?.from?.pathname;
+      if (from) {
+        navigate(from, { replace: true });
+        return;
+      }
 
-  // ── Password login state ───────────────────────────────────────────────
-  const [form, setForm]               = useState({ email: "", password: "" });
-  const [showPassword, setShowPassword] = useState(false);
-  const [pwLoading, setPwLoading]     = useState(false);
+      if (user.role === 'superAdmin') navigate('/super-admin/dashboard');
+      else if (user.role === 'collegeAdmin') navigate('/college-admin/dashboard');
+      else if (user.role === 'officer') navigate('/officer/dashboard');
+      else if (user.academicStatus === 'GRADUATED') navigate('/alumni/dashboard');
+      else navigate('/student/dashboard');
+    }
+  }, [isAuthenticated, user, navigate, location]);
 
-  // ── OTP login state ────────────────────────────────────────────────────
-  const [otpEmail, setOtpEmail]       = useState("");
-  const [otp, setOtp]                 = useState("");
-  const [otpSent, setOtpSent]         = useState(false);
-  const [otpLoading, setOtpLoading]   = useState(false);
-  const [cooldown, setCooldown]       = useState(0);
-
-  const redirectUser = (user) => {
-    if (user.role === "admin")   navigate("/admin/dashboard");
-    else if (user.role === "officer") navigate("/officer/dashboard");
-    else navigate(from);
-  };
-
-  // ── Password Login ─────────────────────────────────────────────────────
   const handlePasswordLogin = async (e) => {
     e.preventDefault();
-    if (!form.email || !form.password) return toast.error("Please fill in all fields");
+    setError('');
+    setIsLoading(true);
+
     try {
-      setPwLoading(true);
-      const user = await login(form.email, form.password);
-      toast.success(`Welcome back, ${user.name.split(" ")[0]}! 👋`);
-      redirectUser(user);
+      await login(email, password);
+      toast.success('Welcome back!');
     } catch (err) {
-      toast.error(err?.response?.data?.message || "Invalid credentials");
+      setError(err.response?.data?.message || 'Invalid email or password');
+      setPassword(''); // Strictly clear only the password field on failure
     } finally {
-      setPwLoading(false);
+      setIsLoading(false);
     }
   };
 
-  // ── Send Login OTP ─────────────────────────────────────────────────────
   const handleSendOtp = async (e) => {
     e.preventDefault();
-    if (!otpEmail) return toast.error("Please enter your email");
+    if (!email) {
+      setError('Please enter your email first');
+      return;
+    }
+    
+    setError('');
+    setIsLoading(true);
+
     try {
-      setOtpLoading(true);
-      await sendLoginOtp(otpEmail);
+      const res = await api.post('/auth/send-login-otp', { email });
       setOtpSent(true);
-      setOtp("");
-      toast.success("OTP sent to your email!");
-      startCooldown();
+      toast.success(res.data.message || 'OTP sent to your email');
     } catch (err) {
-      toast.error(err?.response?.data?.message || "Failed to send OTP");
+      setError(err.response?.data?.message || 'Failed to send OTP');
     } finally {
-      setOtpLoading(false);
+      setIsLoading(false);
     }
   };
 
-  // ── Verify Login OTP ───────────────────────────────────────────────────
   const handleVerifyOtp = async (e) => {
     e.preventDefault();
-    if (otp.length !== 6) return toast.error("Please enter the 6-digit OTP");
-    try {
-      setOtpLoading(true);
-      const res  = await verifyLoginOtp(otpEmail, otp);
-      const data = res.data.data;
-      // Store token and update auth context
-      localStorage.setItem("hireloop_token", data.token);
-      localStorage.setItem("hireloop_user", JSON.stringify(data.user));
-      updateUser(data.user);
-      // Force page reload to reinitialize auth
-      toast.success(`Welcome, ${data.user.name.split(" ")[0]}! 👋`);
-      window.location.href = data.user.role === "admin"
-        ? "/admin/dashboard"
-        : data.user.role === "officer"
-        ? "/officer/dashboard"
-        : from;
-    } catch (err) {
-      toast.error(err?.response?.data?.message || "Invalid OTP");
-      setOtp("");
-    } finally {
-      setOtpLoading(false);
-    }
-  };
+    setError('');
+    setIsLoading(true);
 
-  // ── Cooldown timer ─────────────────────────────────────────────────────
-  const startCooldown = () => {
-    setCooldown(COOLDOWN);
-    const interval = setInterval(() => {
-      setCooldown((prev) => {
-        if (prev <= 1) { clearInterval(interval); return 0; }
-        return prev - 1;
-      });
-    }, 1000);
+    try {
+      const res = await api.post('/auth/verify-login-otp', { email, otp });
+      const { token, user: userData } = res.data.data;
+      
+      // Update global auth context manually since we bypassed the standard context login
+      updateUser({ ...userData, token });
+      toast.success('Login successful!');
+    } catch (err) {
+      setError(err.response?.data?.message || 'Invalid OTP');
+      setOtp('');
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4 pt-16">
-      <div className="w-full max-w-md">
-
-        {/* Logo */}
-        <div className="text-center mb-8">
-          <Link to="/" className="inline-flex items-center gap-2.5 mb-6">
-            <div className="w-10 h-10 bg-indigo-600 rounded-xl flex items-center justify-center shadow-sm">
-              <span className="text-white font-bold text-lg">H</span>
-            </div>
-            <span className="text-2xl font-bold text-gray-900 tracking-tight">HireLoop</span>
+    <div className="min-h-screen bg-gray-50 flex flex-col justify-center py-12 sm:px-6 lg:px-8">
+      <div className="sm:mx-auto sm:w-full sm:max-w-md">
+        <Link to="/" className="flex justify-center text-3xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-blue-600 to-indigo-600 pb-2">
+          HIRELOOP
+        </Link>
+        <h2 className="mt-2 text-center text-2xl font-extrabold text-gray-900">
+          Sign in to your account
+        </h2>
+        <p className="mt-2 text-center text-sm text-gray-600">
+          Or{' '}
+          <Link to="/register" className="font-medium text-indigo-600 hover:text-indigo-500 transition-colors">
+            create a new account
           </Link>
-          <h2 className="text-2xl font-bold text-gray-900">Welcome back</h2>
-          <p className="text-gray-500 mt-2 text-sm">Sign in to your account</p>
-        </div>
+        </p>
+      </div>
 
-        {/* Tab Switcher */}
-        <div className="flex gap-1 bg-gray-100 p-1 rounded-xl mb-5">
-          <button
-            onClick={() => { setTab("password"); setOtpSent(false); }}
-            className={`flex-1 flex items-center justify-center gap-2 py-2 rounded-lg text-sm font-medium transition-all
-              ${tab === "password" ? "bg-white text-indigo-700 shadow-sm" : "text-gray-500 hover:text-gray-700"}`}
-          >
-            <KeyRound className="w-4 h-4" /> Password Login
-          </button>
-          <button
-            onClick={() => { setTab("otp"); setOtpSent(false); }}
-            className={`flex-1 flex items-center justify-center gap-2 py-2 rounded-lg text-sm font-medium transition-all
-              ${tab === "otp" ? "bg-white text-indigo-700 shadow-sm" : "text-gray-500 hover:text-gray-700"}`}
-          >
-            <Mail className="w-4 h-4" /> OTP Login
-          </button>
-        </div>
-
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-8">
-
-          {/* ── Password Login ── */}
-          {tab === "password" && (
-            <form onSubmit={handlePasswordLogin} className="space-y-5">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1.5">Email Address</label>
-                <input
-                  type="email" name="email" value={form.email}
-                  onChange={(e) => setForm((p) => ({ ...p, email: e.target.value }))}
-                  className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all"
-                  placeholder="College Email" autoComplete="email"
-                />
-              </div>
-
-              <div>
-                <div className="flex items-center justify-between mb-1.5">
-                  <label className="block text-sm font-medium text-gray-700">Password</label>
-                  <Link to="/forgot-password" className="text-xs text-indigo-600 hover:text-indigo-700 font-medium">
-                    Forgot password?
-                  </Link>
-                </div>
-                <div className="relative">
-                  <input
-                    type={showPassword ? "text" : "password"} name="password" value={form.password}
-                    onChange={(e) => setForm((p) => ({ ...p, password: e.target.value }))}
-                    className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all pr-10"
-                    placeholder="••••••••" autoComplete="current-password"
-                  />
-                  <button type="button" onClick={() => setShowPassword((p) => !p)}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
-                    {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                  </button>
+      <div className="mt-8 sm:mx-auto sm:w-full sm:max-w-md">
+        <div className="bg-white py-8 px-4 shadow sm:rounded-lg sm:px-10 border border-gray-100">
+          
+          {error && (
+            <motion.div 
+              initial={{ opacity: 0, y: -10 }} 
+              animate={{ opacity: 1, y: 0 }} 
+              className="mb-4 bg-red-50 border-l-4 border-red-500 p-4 rounded-md"
+            >
+              <div className="flex">
+                <div className="ml-3">
+                  <p className="text-sm text-red-700">{error}</p>
                 </div>
               </div>
-
-              <button type="submit" disabled={pwLoading}
-                className="w-full bg-indigo-600 text-white font-medium py-2.5 rounded-lg hover:bg-indigo-700 transition-colors disabled:opacity-70 flex items-center justify-center">
-                {pwLoading ? <Loader2 className="w-5 h-5 animate-spin" /> : "Sign In"}
-              </button>
-            </form>
+            </motion.div>
           )}
 
-          {/* ── OTP Login ── */}
-          {tab === "otp" && !otpSent && (
-            <form onSubmit={handleSendOtp} className="space-y-5">
-              <div className="text-center mb-2">
-                <div className="w-12 h-12 bg-indigo-50 rounded-full flex items-center justify-center mx-auto mb-3">
-                  <Mail className="w-6 h-6 text-indigo-600" />
+          <AnimatePresence mode="wait">
+            {!isOtpMode ? (
+              <motion.form
+                key="password-form"
+                initial={{ opacity: 0, x: -20 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: 20 }}
+                transition={{ duration: 0.2 }}
+                className="space-y-6"
+                onSubmit={handlePasswordLogin}
+              >
+                <div>
+                  <label htmlFor="email" className="block text-sm font-medium text-gray-700">
+                    Email address
+                  </label>
+                  <div className="mt-1">
+                    <input
+                      id="email"
+                      name="email"
+                      type="email"
+                      autoComplete="email"
+                      required
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      className="appearance-none block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm transition-colors"
+                    />
+                  </div>
                 </div>
-                <p className="text-sm text-gray-500">Enter your registered email and we'll send you a 6-digit login code.</p>
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1.5">Email Address</label>
-                <input
-                  type="email" value={otpEmail} onChange={(e) => setOtpEmail(e.target.value)}
-                  className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all"
-                  placeholder="College Email" autoComplete="email"
-                />
-              </div>
-              <button type="submit" disabled={otpLoading}
-                className="w-full bg-indigo-600 text-white font-medium py-2.5 rounded-lg hover:bg-indigo-700 transition-colors disabled:opacity-70 flex items-center justify-center">
-                {otpLoading ? <Loader2 className="w-5 h-5 animate-spin" /> : "Send OTP"}
-              </button>
-            </form>
-          )}
 
-          {tab === "otp" && otpSent && (
-            <form onSubmit={handleVerifyOtp} className="space-y-5">
-              <div className="text-center mb-2">
-                <div className="w-12 h-12 bg-green-50 rounded-full flex items-center justify-center mx-auto mb-3">
-                  <Mail className="w-6 h-6 text-green-600" />
+                <div>
+                  <div className="flex items-center justify-between">
+                    <label htmlFor="password" className="block text-sm font-medium text-gray-700">
+                      Password
+                    </label>
+                    <div className="text-sm">
+                      <Link to="/forgot-password" className="font-medium text-indigo-600 hover:text-indigo-500 transition-colors">
+                        Forgot your password?
+                      </Link>
+                    </div>
+                  </div>
+                  <div className="mt-1">
+                    <input
+                      id="password"
+                      name="password"
+                      type="password"
+                      autoComplete="current-password"
+                      required
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      className="appearance-none block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm transition-colors"
+                    />
+                  </div>
                 </div>
-                <p className="text-sm font-semibold text-gray-800">Check your inbox</p>
-                <p className="text-xs text-gray-500 mt-1">
-                  OTP sent to <span className="font-medium text-gray-700">{otpEmail}</span>
-                </p>
-              </div>
 
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-3 text-center">
-                  Enter 6-digit OTP
-                </label>
-                <OtpInput value={otp} onChange={setOtp} disabled={otpLoading} />
-              </div>
-
-              <button type="submit" disabled={otpLoading || otp.length !== 6}
-                className="w-full bg-indigo-600 text-white font-medium py-2.5 rounded-lg hover:bg-indigo-700 transition-colors disabled:opacity-70 flex items-center justify-center">
-                {otpLoading ? <Loader2 className="w-5 h-5 animate-spin" /> : "Verify & Login"}
-              </button>
-
-              <div className="text-center">
-                {cooldown > 0 ? (
-                  <p className="text-xs text-gray-400">Resend OTP in <span className="font-semibold text-gray-600">{cooldown}s</span></p>
-                ) : (
-                  <button type="button" onClick={handleSendOtp} disabled={otpLoading}
-                    className="text-xs text-indigo-600 font-medium hover:underline disabled:opacity-50">
-                    Resend OTP
+                <div>
+                  <button
+                    type="submit"
+                    disabled={isLoading}
+                    className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition-colors disabled:opacity-70"
+                  >
+                    {isLoading ? 'Signing in...' : 'Sign in'}
                   </button>
+                </div>
+              </motion.form>
+            ) : (
+              <motion.form
+                key="otp-form"
+                initial={{ opacity: 0, x: 20 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: -20 }}
+                transition={{ duration: 0.2 }}
+                className="space-y-6"
+                onSubmit={otpSent ? handleVerifyOtp : handleSendOtp}
+              >
+                <div>
+                  <label htmlFor="email-otp" className="block text-sm font-medium text-gray-700">
+                    Email address
+                  </label>
+                  <div className="mt-1">
+                    <input
+                      id="email-otp"
+                      name="email"
+                      type="email"
+                      required
+                      disabled={otpSent}
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      className="appearance-none block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm transition-colors disabled:bg-gray-100 disabled:text-gray-500"
+                    />
+                  </div>
+                </div>
+
+                {otpSent && (
+                  <motion.div
+                    initial={{ opacity: 0, height: 0 }}
+                    animate={{ opacity: 1, height: 'auto' }}
+                  >
+                    <label htmlFor="otp" className="block text-sm font-medium text-gray-700">
+                      One-Time Password (OTP)
+                    </label>
+                    <div className="mt-1">
+                      <input
+                        id="otp"
+                        name="otp"
+                        type="text"
+                        required
+                        value={otp}
+                        onChange={(e) => setOtp(e.target.value)}
+                        placeholder="123456"
+                        className="appearance-none block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm transition-colors tracking-widest"
+                      />
+                    </div>
+                  </motion.div>
                 )}
-                <button type="button" onClick={() => { setOtpSent(false); setOtp(""); }}
-                  className="block w-full text-xs text-gray-400 hover:text-gray-600 mt-1">
-                  ← Change email
-                </button>
-              </div>
-            </form>
-          )}
 
-          <div className="flex items-center gap-3 my-6">
-            <div className="flex-1 h-px bg-gray-100" />
-            <span className="text-xs font-medium text-gray-400 uppercase">Or</span>
-            <div className="flex-1 h-px bg-gray-100" />
+                <div>
+                  <button
+                    type="submit"
+                    disabled={isLoading}
+                    className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition-colors disabled:opacity-70"
+                  >
+                    {isLoading ? 'Processing...' : (otpSent ? 'Verify OTP & Sign In' : 'Send OTP')}
+                  </button>
+                </div>
+              </motion.form>
+            )}
+          </AnimatePresence>
+
+          <div className="mt-6">
+            <div className="relative">
+              <div className="absolute inset-0 flex items-center">
+                <div className="w-full border-t border-gray-300" />
+              </div>
+              <div className="relative flex justify-center text-sm">
+                <span className="px-2 bg-white text-gray-500">Or continue with</span>
+              </div>
+            </div>
+
+            <div className="mt-6">
+              <button
+                onClick={() => {
+                  setIsOtpMode(!isOtpMode);
+                  setError('');
+                }}
+                className="w-full flex justify-center py-2 px-4 border border-gray-300 rounded-md shadow-sm bg-white text-sm font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition-colors"
+              >
+                {isOtpMode ? 'Password Login' : 'OTP Login'}
+              </button>
+            </div>
           </div>
 
-          <p className="text-center text-sm text-gray-500">
-            Don't have an account?{" "}
-            <Link to="/register" className="text-indigo-600 font-medium hover:text-indigo-700">
-              Create one free
-            </Link>
-          </p>
-        </div>
-
-        <div className="mt-6 p-4 bg-indigo-50 rounded-xl border border-indigo-100 flex items-start gap-3">
-          <GraduationCap className="w-5 h-5 text-indigo-600 shrink-0 mt-0.5" />
-          <p className="text-xs text-indigo-800 font-medium leading-relaxed">
-            Use your official college email to access your verified campus community.
-          </p>
         </div>
       </div>
     </div>

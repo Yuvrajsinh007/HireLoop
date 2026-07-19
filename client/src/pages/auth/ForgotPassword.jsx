@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import toast from "react-hot-toast";
+import { motion, AnimatePresence } from "framer-motion";
 import { forgotPassword, verifyResetOtp, resetPassword } from "../../services/authService";
 import OtpInput from "../../components/common/OtpInput";
 import { ArrowLeft, Loader2, Eye, EyeOff, CheckCircle } from "lucide-react";
@@ -97,6 +98,13 @@ const ForgotPassword = () => {
 
   const STEPS = ["Enter Email", "Verify OTP", "New Password"];
 
+  // Animation variants
+  const formVariants = {
+    hidden: { opacity: 0, x: 20 },
+    visible: { opacity: 1, x: 0, transition: { duration: 0.3 } },
+    exit: { opacity: 0, x: -20, transition: { duration: 0.2 } }
+  };
+
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4 pt-16">
       <div className="w-full max-w-md">
@@ -129,137 +137,177 @@ const ForgotPassword = () => {
           </div>
         )}
 
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-8">
-
-          {/* ── Step 1: Enter Email ── */}
-          {step === 1 && (
-            <form onSubmit={handleSendOtp} className="space-y-5">
-              <div className="text-center mb-2">
-                <p className="text-sm text-gray-500">Enter your registered email address and we'll send you a 6-digit OTP.</p>
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1.5">Email Address</label>
-                <input
-                  type="email" value={email} onChange={(e) => setEmail(e.target.value)}
-                  className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all"
-                  placeholder="College Email"
-                />
-              </div>
-              <button type="submit" disabled={loading}
-                className="w-full bg-indigo-600 text-white font-medium py-2.5 rounded-lg hover:bg-indigo-700 transition-colors disabled:opacity-70 flex items-center justify-center">
-                {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : "Send OTP"}
-              </button>
-              <p className="text-center text-sm text-gray-500">
-                Remember your password?{" "}
-                <Link to="/login" className="text-indigo-600 font-medium hover:text-indigo-700">Sign in</Link>
-              </p>
-            </form>
-          )}
-
-          {/* ── Step 2: Verify OTP ── */}
-          {step === 2 && (
-            <form onSubmit={handleVerifyOtp} className="space-y-5">
-              <div className="text-center mb-2">
-                <p className="text-sm font-semibold text-gray-800">Check your inbox</p>
-                <p className="text-xs text-gray-500 mt-1">
-                  OTP sent to <span className="font-medium text-gray-700">{email}</span>
-                </p>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-3 text-center">
-                  Enter 6-digit OTP
-                </label>
-                <OtpInput value={otp} onChange={setOtp} disabled={loading} />
-              </div>
-
-              <button type="submit" disabled={loading || otp.length !== 6}
-                className="w-full bg-indigo-600 text-white font-medium py-2.5 rounded-lg hover:bg-indigo-700 transition-colors disabled:opacity-70 flex items-center justify-center">
-                {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : "Verify OTP"}
-              </button>
-
-              <div className="text-center space-y-1">
-                {cooldown > 0 ? (
-                  <p className="text-xs text-gray-400">Resend in <span className="font-semibold text-gray-600">{cooldown}s</span></p>
-                ) : (
-                  <button type="button" onClick={handleResendOtp} disabled={loading}
-                    className="text-xs text-indigo-600 font-medium hover:underline">
-                    Resend OTP
-                  </button>
-                )}
-                <button type="button" onClick={() => { setStep(1); setOtp(""); }}
-                  className="block w-full text-xs text-gray-400 hover:text-gray-600">
-                  ← Change email
-                </button>
-              </div>
-            </form>
-          )}
-
-          {/* ── Step 3: New Password ── */}
-          {step === 3 && (
-            <form onSubmit={handleResetPassword} className="space-y-5">
-              <div className="text-center mb-2">
-                <p className="text-sm text-gray-500">OTP verified! Create your new password.</p>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1.5">New Password</label>
-                <div className="relative">
+        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-8 overflow-hidden relative">
+          <AnimatePresence mode="wait">
+            {/* ── Step 1: Enter Email ── */}
+            {step === 1 && (
+              <motion.form 
+                key="step1"
+                variants={formVariants}
+                initial="hidden"
+                animate="visible"
+                exit="exit"
+                onSubmit={handleSendOtp} 
+                className="space-y-5"
+              >
+                <div className="text-center mb-2">
+                  <p className="text-sm text-gray-500">Enter your registered email address and we'll send you a 6-digit OTP.</p>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1.5">Email Address</label>
                   <input
-                    type={showPw ? "text" : "password"} value={newPassword}
-                    onChange={(e) => setNewPassword(e.target.value)}
-                    className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all pr-10"
-                    placeholder="Min. 6 characters"
+                    type="email" value={email} onChange={(e) => setEmail(e.target.value)}
+                    className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all"
+                    placeholder="College Email"
                   />
-                  <button type="button" onClick={() => setShowPw((p) => !p)}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
-                    {showPw ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                </div>
+                <button type="submit" disabled={loading}
+                  className="w-full bg-indigo-600 text-white font-medium py-2.5 rounded-lg hover:bg-indigo-700 transition-colors disabled:opacity-70 flex items-center justify-center">
+                  {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : "Send OTP"}
+                </button>
+                <p className="text-center text-sm text-gray-500">
+                  Remember your password?{" "}
+                  <Link to="/login" className="text-indigo-600 font-medium hover:text-indigo-700 transition-colors">Sign in</Link>
+                </p>
+              </motion.form>
+            )}
+
+            {/* ── Step 2: Verify OTP ── */}
+            {step === 2 && (
+              <motion.form 
+                key="step2"
+                variants={formVariants}
+                initial="hidden"
+                animate="visible"
+                exit="exit"
+                onSubmit={handleVerifyOtp} 
+                className="space-y-5"
+              >
+                <div className="text-center mb-2">
+                  <p className="text-sm font-semibold text-gray-800">Check your inbox</p>
+                  <p className="text-xs text-gray-500 mt-1">
+                    OTP sent to <span className="font-medium text-gray-700">{email}</span>
+                  </p>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-3 text-center">
+                    Enter 6-digit OTP
+                  </label>
+                  <OtpInput value={otp} onChange={setOtp} disabled={loading} />
+                </div>
+
+                <button type="submit" disabled={loading || otp.length !== 6}
+                  className="w-full bg-indigo-600 text-white font-medium py-2.5 rounded-lg hover:bg-indigo-700 transition-colors disabled:opacity-70 flex items-center justify-center">
+                  {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : "Verify OTP"}
+                </button>
+
+                <div className="text-center space-y-1">
+                  {cooldown > 0 ? (
+                    <p className="text-xs text-gray-400">Resend in <span className="font-semibold text-gray-600">{cooldown}s</span></p>
+                  ) : (
+                    <button type="button" onClick={handleResendOtp} disabled={loading}
+                      className="text-xs text-indigo-600 font-medium hover:underline">
+                      Resend OTP
+                    </button>
+                  )}
+                  <button type="button" onClick={() => { setStep(1); setOtp(""); }}
+                    className="block w-full text-xs text-gray-400 hover:text-gray-600 transition-colors">
+                    ← Change email
                   </button>
                 </div>
-              </div>
+              </motion.form>
+            )}
 
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1.5">Confirm Password</label>
-                <input
-                  type={showPw ? "text" : "password"} value={confirmPassword}
-                  onChange={(e) => setConfirmPassword(e.target.value)}
-                  className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all"
-                  placeholder="Re-enter password"
-                />
-              </div>
-
-              {/* Password match indicator */}
-              {confirmPassword && (
-                <p className={`text-xs font-medium ${newPassword === confirmPassword ? "text-green-600" : "text-red-500"}`}>
-                  {newPassword === confirmPassword ? "✅ Passwords match" : "❌ Passwords do not match"}
-                </p>
-              )}
-
-              <button type="submit" disabled={loading}
-                className="w-full bg-indigo-600 text-white font-medium py-2.5 rounded-lg hover:bg-indigo-700 transition-colors disabled:opacity-70 flex items-center justify-center">
-                {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : "Reset Password"}
-              </button>
-            </form>
-          )}
-
-          {/* ── Step 4: Success ── */}
-          {step === 4 && (
-            <div className="text-center py-4">
-              <div className="w-16 h-16 bg-green-50 rounded-full flex items-center justify-center mx-auto mb-4">
-                <CheckCircle className="w-8 h-8 text-green-500" />
-              </div>
-              <h3 className="text-lg font-bold text-gray-900 mb-2">Password Reset!</h3>
-              <p className="text-sm text-gray-500 mb-6 leading-relaxed">
-                Your password has been changed successfully.<br />Please log in with your new password.
-              </p>
-              <button
-                onClick={() => navigate("/login")}
-                className="w-full bg-indigo-600 text-white font-medium py-2.5 rounded-lg hover:bg-indigo-700 transition-colors flex items-center justify-center gap-2"
+            {/* ── Step 3: New Password ── */}
+            {step === 3 && (
+              <motion.form 
+                key="step3"
+                variants={formVariants}
+                initial="hidden"
+                animate="visible"
+                exit="exit"
+                onSubmit={handleResetPassword} 
+                className="space-y-5"
               >
-                <ArrowLeft className="w-4 h-4" /> Go to Login
-              </button>
-            </div>
-          )}
+                <div className="text-center mb-2">
+                  <p className="text-sm text-gray-500">OTP verified! Create your new password.</p>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1.5">New Password</label>
+                  <div className="relative">
+                    <input
+                      type={showPw ? "text" : "password"} value={newPassword}
+                      onChange={(e) => setNewPassword(e.target.value)}
+                      className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all pr-10"
+                      placeholder="Min. 6 characters"
+                    />
+                    <button type="button" onClick={() => setShowPw((p) => !p)}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors">
+                      {showPw ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                    </button>
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1.5">Confirm Password</label>
+                  <input
+                    type={showPw ? "text" : "password"} value={confirmPassword}
+                    onChange={(e) => setConfirmPassword(e.target.value)}
+                    className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all"
+                    placeholder="Re-enter password"
+                  />
+                </div>
+
+                {/* Password match indicator */}
+                {confirmPassword && (
+                  <motion.p 
+                    initial={{ opacity: 0, height: 0 }}
+                    animate={{ opacity: 1, height: "auto" }}
+                    className={`text-xs font-medium ${newPassword === confirmPassword ? "text-green-600" : "text-red-500"}`}
+                  >
+                    {newPassword === confirmPassword ? "✅ Passwords match" : "❌ Passwords do not match"}
+                  </motion.p>
+                )}
+
+                <button type="submit" disabled={loading}
+                  className="w-full bg-indigo-600 text-white font-medium py-2.5 rounded-lg hover:bg-indigo-700 transition-colors disabled:opacity-70 flex items-center justify-center">
+                  {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : "Reset Password"}
+                </button>
+              </motion.form>
+            )}
+
+            {/* ── Step 4: Success ── */}
+            {step === 4 && (
+              <motion.div 
+                key="step4"
+                variants={formVariants}
+                initial="hidden"
+                animate="visible"
+                className="text-center py-4"
+              >
+                <motion.div 
+                  initial={{ scale: 0 }}
+                  animate={{ scale: 1 }}
+                  transition={{ type: "spring", stiffness: 200, damping: 15, delay: 0.2 }}
+                  className="w-16 h-16 bg-green-50 rounded-full flex items-center justify-center mx-auto mb-4"
+                >
+                  <CheckCircle className="w-8 h-8 text-green-500" />
+                </motion.div>
+                <h3 className="text-lg font-bold text-gray-900 mb-2">Password Reset!</h3>
+                <p className="text-sm text-gray-500 mb-6 leading-relaxed">
+                  Your password has been changed successfully.<br />Please log in with your new password.
+                </p>
+                <button
+                  onClick={() => navigate("/login")}
+                  className="w-full bg-indigo-600 text-white font-medium py-2.5 rounded-lg hover:bg-indigo-700 transition-colors flex items-center justify-center gap-2"
+                >
+                  <ArrowLeft className="w-4 h-4" /> Go to Login
+                </button>
+              </motion.div>
+            )}
+          </AnimatePresence>
         </div>
       </div>
     </div>

@@ -1,7 +1,7 @@
 import { useState } from "react";
 import toast from "react-hot-toast";
 import { APPLICATION_STAGES, STAGE_COLORS } from "../../utils/constants";
-import { updateAppStage } from "../../services/studentService";
+import { updateAppStage } from "../../services/memberService";
 import { X, ArrowRight, Loader2 } from "lucide-react";
 
 const StageUpdateModal = ({ application, onClose, onUpdated }) => {

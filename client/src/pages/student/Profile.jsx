@@ -4,23 +4,23 @@ import Avatar from "../../components/common/Avatar";
 import Loader from "../../components/common/Loader";
 import OtpInput from "../../components/common/OtpInput";
 import { useAuth } from "../../hooks/useAuth";
-import { getStudentProfile, updateStudentProfile, uploadAvatar, uploadResume } from "../../services/studentService";
+import { getMemberProfile, updateMemberProfile, uploadAvatar, uploadResume } from "../../services/memberService";
 import { sendVerifyOtp, verifyEmailOtp } from "../../services/authService";
-import { BRANCHES, PLACEMENT_STATUSES } from "../../utils/constants";
 import { formatDate } from "../../utils/formatDate";
 import toast from "react-hot-toast";
-import { CheckCircle, Mail, Loader2 } from "lucide-react";
+import { motion, AnimatePresence } from "framer-motion";
+import { CheckCircle, Mail, Loader2, Edit2, X, FileText, Upload, Briefcase } from "lucide-react";
 
 const SKILL_SUGGESTIONS = [
-  "React","Node.js","MongoDB","Express","JavaScript","Python","Java",
-  "C++","SQL","Git","Docker","AWS","TypeScript","Redux","Next.js",
-  "Spring Boot","MySQL","PostgreSQL","REST API","GraphQL",
+  "React", "Node.js", "MongoDB", "Express", "JavaScript", "Python", "Java",
+  "C++", "SQL", "Git", "Docker", "AWS", "TypeScript", "Redux", "Next.js",
+  "Spring Boot", "MySQL", "PostgreSQL", "REST API", "GraphQL",
 ];
 
 const COOLDOWN = 60;
 
 const Profile = () => {
-  const { user, updateUser } = useAuth();
+  const { user, updateUser, isAlumni } = useAuth();
   const avatarInputRef = useRef(null);
   const resumeInputRef = useRef(null);
 
@@ -30,8 +30,9 @@ const Profile = () => {
   const [uploading, setUploading] = useState("");
   const [editMode, setEditMode]   = useState(false);
   const [skillInput, setSkillInput] = useState("");
+  const [topicInput, setTopicInput] = useState("");
 
-  // ── Email Verification OTP state ──────────────────────────────────────
+  // Email Verification OTP state
   const [showVerifySection, setShowVerifySection] = useState(false);
   const [otpSent, setOtpSent]     = useState(false);
   const [otp, setOtp]             = useState("");
@@ -39,32 +40,38 @@ const Profile = () => {
   const [cooldown, setCooldown]   = useState(0);
 
   const [form, setForm] = useState({
-    rollNumber: "", branch: "", batch: "", cgpa: "",
-    skills: [], linkedIn: "", github: "", portfolio: "",
-    bio: "", isAvailableForMentorship: false, placementStatus: "not_started",
+    rollNumber: "", enrollmentYear: "", graduationYear: "", cgpa: "", activeBacklogs: 0,
+    skills: [], linkedIn: "", github: "", portfolio: "", bio: "", alternateEmail: "",
+    isAvailableForMentorship: false, mentorshipTopics: [],
+    currentCompany: "", currentRole: "", currentCTC: ""
   });
 
   useEffect(() => {
     const fetchProfile = async () => {
       try {
         setLoading(true);
-        const res = await getStudentProfile();
+        const res = await getMemberProfile(); // Maps to getProfile in controller
         const p   = res.data.data;
         setProfile(p);
         setForm({
           rollNumber: p.rollNumber || "",
-          branch:     p.branch    || "",
-          batch:      p.batch     || "",
-          cgpa:       p.cgpa      || "",
-          skills:     p.skills    || [],
-          linkedIn:   p.linkedIn  || "",
-          github:     p.github    || "",
-          portfolio:  p.portfolio || "",
-          bio:        p.bio       || "",
+          enrollmentYear: p.enrollmentYear || "",
+          graduationYear: p.graduationYear || "",
+          cgpa: p.cgpa || "",
+          activeBacklogs: p.activeBacklogs || 0,
+          skills: p.skills || [],
+          linkedIn: p.linkedIn || "",
+          github: p.github || "",
+          portfolio: p.portfolio || "",
+          bio: p.bio || "",
+          alternateEmail: p.user?.alternateEmail || "",
           isAvailableForMentorship: p.isAvailableForMentorship || false,
-          placementStatus: p.placementStatus || "not_started",
+          mentorshipTopics: p.mentorshipTopics || [],
+          currentCompany: p.currentCompany || "",
+          currentRole: p.currentRole || "",
+          currentCTC: p.currentCTC || "",
         });
-      } catch {
+      } catch (err) {
         toast.error("Failed to load profile");
       } finally {
         setLoading(false);
@@ -83,7 +90,6 @@ const Profile = () => {
     }, 1000);
   };
 
-  // ── Send Verification OTP ─────────────────────────────────────────────
   const handleSendVerifyOtp = async () => {
     try {
       setVerifyLoading(true);
@@ -99,13 +105,11 @@ const Profile = () => {
     }
   };
 
-  // ── Verify Email OTP ──────────────────────────────────────────────────
   const handleVerifyEmailOtp = async () => {
     if (otp.length !== 6) return toast.error("Please enter the 6-digit OTP");
     try {
       setVerifyLoading(true);
       await verifyEmailOtp(otp);
-      // Update auth context immediately — no logout needed
       updateUser({ isEmailVerified: true });
       toast.success("Email verified successfully! ✅");
       setShowVerifySection(false);
@@ -124,59 +128,49 @@ const Profile = () => {
     setForm((p) => ({ ...p, [name]: type === "checkbox" ? checked : value }));
   };
 
-  const addSkill = (skill) => {
-    const s = skill.trim();
-    if (!s || form.skills.includes(s)) return;
-    setForm((p) => ({ ...p, skills: [...p.skills, s] }));
-    setSkillInput("");
+  const addArrayItem = (field, value, setInput) => {
+    const s = value.trim();
+    if (!s || form[field].includes(s)) return;
+    setForm((p) => ({ ...p, [field]: [...p[field], s] }));
+    setInput("");
   };
 
-  const removeSkill = (skill) =>
-    setForm((p) => ({ ...p, skills: p.skills.filter((s) => s !== skill) }));
+  const removeArrayItem = (field, value) =>
+    setForm((p) => ({ ...p, [field]: p[field].filter((item) => item !== value) }));
 
   const handleSave = async () => {
     try {
       setSaving(true);
-      const res = await updateStudentProfile(form);
+      const res = await updateMemberProfile(form); // Maps to updateProfile in controller
       setProfile(res.data.data);
       setEditMode(false);
+      if (form.alternateEmail) updateUser({ alternateEmail: form.alternateEmail });
       toast.success("Profile updated successfully ✅");
-    } catch {
-      toast.error("Failed to update profile");
+    } catch (err) {
+      toast.error(err?.response?.data?.message || "Failed to update profile");
     } finally {
       setSaving(false);
     }
   };
 
-  const handleAvatarUpload = async (e) => {
+  const handleFileUpload = async (e, type) => {
     const file = e.target.files[0];
     if (!file) return;
     const fd = new FormData();
-    fd.append("avatar", file);
+    fd.append(type, file);
     try {
-      setUploading("avatar");
-      const res = await uploadAvatar(fd);
-      updateUser({ avatar: res.data.data.avatarUrl });
-      toast.success("Profile photo updated!");
-    } catch {
-      toast.error("Failed to upload photo");
-    } finally {
-      setUploading("");
-    }
-  };
-
-  const handleResumeUpload = async (e) => {
-    const file = e.target.files[0];
-    if (!file) return;
-    const fd = new FormData();
-    fd.append("resume", file);
-    try {
-      setUploading("resume");
-      const res = await uploadResume(fd);
-      setProfile((p) => ({ ...p, resumeUrl: res.data.data.resumeUrl }));
-      toast.success("Resume uploaded!");
-    } catch {
-      toast.error("Failed to upload resume");
+      setUploading(type);
+      if (type === "avatar") {
+        const res = await uploadAvatar(fd);
+        updateUser({ avatar: res.data.data.avatarUrl });
+        toast.success("Profile photo updated!");
+      } else {
+        const res = await uploadResume(fd);
+        setProfile((p) => ({ ...p, resumeUrl: res.data.data.resumeUrl }));
+        toast.success("Resume uploaded!");
+      }
+    } catch (err) {
+      toast.error(`Failed to upload ${type}`);
     } finally {
       setUploading("");
     }
@@ -184,290 +178,364 @@ const Profile = () => {
 
   if (loading) return (
     <DashboardLayout>
-      <div className="flex items-center justify-center min-h-96">
+      <div className="flex items-center justify-center min-h-[60vh]">
         <Loader size="lg" text="Loading profile..." />
       </div>
     </DashboardLayout>
   );
 
-  const statusObj = PLACEMENT_STATUSES.find((s) => s.value === form.placementStatus);
+  // Animation variants
+  const containerVariants = {
+    hidden: { opacity: 0 },
+    show: {
+      opacity: 1,
+      transition: { staggerChildren: 0.1 }
+    }
+  };
+
+  const itemVariants = {
+    hidden: { opacity: 0, y: 20 },
+    show: { opacity: 1, y: 0, transition: { duration: 0.4 } }
+  };
 
   return (
     <DashboardLayout>
-      <div className="page-wrapper fade-in max-w-3xl mx-auto">
-
+      <motion.div 
+        variants={containerVariants}
+        initial="hidden"
+        animate="show"
+        className="max-w-4xl mx-auto py-8 px-4 sm:px-6 lg:px-8"
+      >
         {/* Header */}
-        <div className="flex items-center justify-between mb-6">
-          <h1 className="section-title mb-0">My Profile</h1>
+        <motion.div variants={itemVariants} className="flex items-center justify-between mb-8">
+          <div>
+            <h1 className="text-2xl font-bold text-gray-900">My Profile</h1>
+            <p className="text-sm text-gray-500 mt-1">Manage your academic and professional details</p>
+          </div>
           {!editMode ? (
-            <button onClick={() => setEditMode(true)} className="btn-secondary">✏️ Edit Profile</button>
+            <button onClick={() => setEditMode(true)} className="inline-flex items-center px-4 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 transition-colors">
+              <Edit2 className="w-4 h-4 mr-2 text-gray-500" /> Edit Profile
+            </button>
           ) : (
-            <div className="flex gap-2">
-              <button onClick={() => setEditMode(false)} className="btn-secondary">Cancel</button>
-              <button onClick={handleSave} disabled={saving} className="btn-primary">
-                {saving ? "Saving..." : "Save Changes"}
+            <div className="flex gap-3">
+              <button onClick={() => setEditMode(false)} className="inline-flex items-center px-4 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 transition-colors">
+                Cancel
+              </button>
+              <button onClick={handleSave} disabled={saving} className="inline-flex items-center px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 disabled:opacity-70 transition-colors">
+                {saving ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : "Save Changes"}
               </button>
             </div>
           )}
-        </div>
+        </motion.div>
 
         {/* ── Email Verification Banner ── */}
-        {!user?.isEmailVerified && (
-          <div className="card mb-6 border-yellow-200 bg-yellow-50">
-            <div className="flex items-start justify-between gap-4 flex-wrap">
-              <div className="flex items-start gap-3">
-                <Mail className="w-5 h-5 text-yellow-600 mt-0.5 flex-shrink-0" />
-                <div>
-                  <p className="font-semibold text-yellow-800 text-sm">Email not verified</p>
-                  <p className="text-xs text-yellow-700 mt-0.5">
-                    Verify your email at <strong>{user?.email}</strong> to unlock all features.
-                  </p>
-                </div>
-              </div>
-              {!showVerifySection && (
-                <button
-                  onClick={() => setShowVerifySection(true)}
-                  className="text-sm font-semibold text-yellow-800 bg-yellow-200 hover:bg-yellow-300 px-4 py-1.5 rounded-lg transition-colors flex-shrink-0"
-                >
-                  Verify Email
-                </button>
-              )}
-            </div>
-
-            {/* OTP Section */}
-            {showVerifySection && (
-              <div className="mt-4 pt-4 border-t border-yellow-200">
-                {!otpSent ? (
-                  <div className="flex items-center gap-3 flex-wrap">
-                    <p className="text-sm text-yellow-700 flex-1">Click to receive a 6-digit OTP on your email.</p>
-                    <button
-                      onClick={handleSendVerifyOtp}
-                      disabled={verifyLoading}
-                      className="btn-primary text-sm flex items-center gap-2"
-                    >
-                      {verifyLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : "Send OTP"}
-                    </button>
-                  </div>
-                ) : (
-                  <div className="space-y-4">
-                    <p className="text-sm text-yellow-700 text-center">
-                      OTP sent to <strong>{user?.email}</strong>. Enter it below:
+        <AnimatePresence>
+          {!user?.isEmailVerified && (
+            <motion.div variants={itemVariants} exit={{ opacity: 0, height: 0 }} className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-6 shadow-sm">
+              <div className="flex items-start justify-between gap-4 flex-wrap">
+                <div className="flex items-start gap-3">
+                  <Mail className="w-5 h-5 text-yellow-600 mt-0.5 flex-shrink-0" />
+                  <div>
+                    <p className="font-semibold text-yellow-800 text-sm">Email not verified</p>
+                    <p className="text-sm text-yellow-700 mt-0.5">
+                      Verify your institutional email <strong>{user?.email}</strong> to unlock placement features.
                     </p>
-                    <OtpInput value={otp} onChange={setOtp} disabled={verifyLoading} />
-                    <div className="flex gap-3 justify-center">
-                      <button
-                        onClick={handleVerifyEmailOtp}
-                        disabled={verifyLoading || otp.length !== 6}
-                        className="btn-primary flex items-center gap-2"
-                      >
-                        {verifyLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : "Verify OTP"}
-                      </button>
-                    </div>
-                    <div className="text-center">
-                      {cooldown > 0 ? (
-                        <p className="text-xs text-yellow-600">Resend in <strong>{cooldown}s</strong></p>
-                      ) : (
-                        <button
-                          onClick={handleSendVerifyOtp}
-                          disabled={verifyLoading}
-                          className="text-xs text-yellow-700 font-medium hover:underline"
-                        >
-                          Resend OTP
-                        </button>
-                      )}
-                    </div>
                   </div>
+                </div>
+                {!showVerifySection && (
+                  <button
+                    onClick={() => setShowVerifySection(true)}
+                    className="text-sm font-semibold text-yellow-800 bg-yellow-200 hover:bg-yellow-300 px-4 py-2 rounded-md transition-colors flex-shrink-0"
+                  >
+                    Verify Email
+                  </button>
                 )}
               </div>
-            )}
-          </div>
-        )}
 
-        {/* Verified badge */}
+              {/* OTP Section */}
+              <AnimatePresence>
+                {showVerifySection && (
+                  <motion.div 
+                    initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }} exit={{ opacity: 0, height: 0 }}
+                    className="mt-4 pt-4 border-t border-yellow-200"
+                  >
+                    {!otpSent ? (
+                      <div className="flex items-center justify-between gap-3 flex-wrap">
+                        <p className="text-sm text-yellow-700">Click below to receive a 6-digit OTP on your email.</p>
+                        <button onClick={handleSendVerifyOtp} disabled={verifyLoading} className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-yellow-600 hover:bg-yellow-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-yellow-500 disabled:opacity-70">
+                          {verifyLoading ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : "Send OTP"}
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="space-y-4 max-w-md">
+                        <p className="text-sm text-yellow-700">
+                          OTP sent to <strong>{user?.email}</strong>. Enter it below:
+                        </p>
+                        <OtpInput value={otp} onChange={setOtp} disabled={verifyLoading} />
+                        <div className="flex items-center gap-3">
+                          <button onClick={handleVerifyEmailOtp} disabled={verifyLoading || otp.length !== 6} className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 disabled:opacity-70">
+                            {verifyLoading ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : "Verify OTP"}
+                          </button>
+                          {cooldown > 0 ? (
+                            <span className="text-sm text-yellow-700">Resend in {cooldown}s</span>
+                          ) : (
+                            <button onClick={handleSendVerifyOtp} disabled={verifyLoading} className="text-sm text-indigo-600 hover:text-indigo-800 font-medium transition-colors">
+                              Resend OTP
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    )}
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* Verified Badge */}
         {user?.isEmailVerified && (
-          <div className="card mb-6 border-green-200 bg-green-50 flex items-center gap-3 py-3 px-5">
+          <motion.div variants={itemVariants} className="bg-green-50 border border-green-200 rounded-lg p-4 mb-6 shadow-sm flex items-center gap-3">
             <CheckCircle className="w-5 h-5 text-green-600" />
-            <p className="text-sm font-semibold text-green-800">Email Verified</p>
-          </div>
+            <p className="text-sm font-medium text-green-800">Your institutional email is verified.</p>
+          </motion.div>
         )}
 
-        {/* Avatar Card */}
-        <div className="card mb-6">
-          <div className="flex items-center gap-5">
-            <div className="relative">
-              <Avatar src={user?.avatar} name={user?.name} size="xl" />
+        {/* Avatar & Basic Info Card */}
+        <motion.div variants={itemVariants} className="bg-white shadow rounded-lg p-6 mb-6 border border-gray-100">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center gap-6">
+            <div className="relative group">
+              <Avatar src={user?.avatarUrl} name={user?.name} size="xl" />
               <button
                 onClick={() => avatarInputRef.current?.click()}
-                className="absolute -bottom-1 -right-1 w-7 h-7 bg-indigo-600 rounded-full flex items-center justify-center text-white text-xs hover:bg-indigo-700 transition-colors shadow"
+                className="absolute bottom-0 right-0 w-8 h-8 bg-indigo-600 rounded-full flex items-center justify-center text-white shadow-lg hover:bg-indigo-700 transition-colors"
+                title="Update Avatar"
               >
-                {uploading === "avatar" ? "⟳" : "✏️"}
+                {uploading === "avatar" ? <Loader2 className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />}
               </button>
-              <input ref={avatarInputRef} type="file" accept="image/*" className="hidden" onChange={handleAvatarUpload} />
+              <input ref={avatarInputRef} type="file" accept="image/*" className="hidden" onChange={(e) => handleFileUpload(e, "avatar")} />
             </div>
 
             <div className="flex-1">
-              <h2 className="text-xl font-bold text-gray-900">{user?.name}</h2>
-              <p className="text-gray-500 text-sm">{user?.email}</p>
-              <div className="flex items-center gap-2 mt-2 flex-wrap">
-                <span className="badge badge-indigo capitalize">{user?.role}</span>
-                {statusObj && <span className={`badge ${statusObj.color}`}>{statusObj.label}</span>}
-                {user?.isEmailVerified
-                  ? <span className="badge badge-green">✅ Verified</span>
-                  : <span className="badge badge-yellow">⚠️ Unverified</span>
-                }
+              <h2 className="text-2xl font-bold text-gray-900">{user?.name}</h2>
+              <p className="text-gray-500 text-sm mb-2">{user?.email}</p>
+              <div className="flex flex-wrap gap-2">
+                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800 capitalize">
+                  {user?.role}
+                </span>
+                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-800">
+                  {user?.academicStatus?.replace("_", " ")}
+                </span>
+                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
+                  {user?.employmentStatus}
+                </span>
               </div>
             </div>
 
-            <div className="text-right">
+            <div className="w-full sm:w-auto flex flex-col items-stretch sm:items-end gap-2 mt-4 sm:mt-0">
               {profile?.resumeUrl ? (
-                <div className="space-y-1">
-                  <a href={profile.resumeUrl} target="_blank" rel="noopener noreferrer"
-                    className="block text-sm text-indigo-600 hover:underline font-medium">📄 View Resume</a>
-                  <button onClick={() => resumeInputRef.current?.click()}
-                    className="block text-xs text-gray-400 hover:text-gray-600 w-full text-right">
-                    {uploading === "resume" ? "Uploading..." : "Replace"}
+                <>
+                  <a href={profile.resumeUrl} target="_blank" rel="noopener noreferrer" className="inline-flex items-center justify-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-indigo-700 bg-indigo-100 hover:bg-indigo-200 transition-colors">
+                    <FileText className="w-4 h-4 mr-2" /> View Resume
+                  </a>
+                  <button onClick={() => resumeInputRef.current?.click()} className="text-xs text-gray-500 hover:text-indigo-600 text-center sm:text-right font-medium transition-colors">
+                    {uploading === "resume" ? "Uploading..." : "Replace Resume"}
                   </button>
-                </div>
+                </>
               ) : (
-                <button onClick={() => resumeInputRef.current?.click()} className="btn-secondary text-sm">
-                  {uploading === "resume" ? "Uploading..." : "📄 Upload Resume"}
+                <button onClick={() => resumeInputRef.current?.click()} className="inline-flex items-center justify-center px-4 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 transition-colors">
+                  {uploading === "resume" ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Upload className="w-4 h-4 mr-2 text-gray-500" />} Upload Resume
                 </button>
               )}
-              <input ref={resumeInputRef} type="file" accept=".pdf" className="hidden" onChange={handleResumeUpload} />
+              <input ref={resumeInputRef} type="file" accept=".pdf" className="hidden" onChange={(e) => handleFileUpload(e, "resume")} />
             </div>
           </div>
-        </div>
+        </motion.div>
 
         {/* Academic Info */}
-        <div className="card mb-6">
-          <h3 className="font-bold text-gray-800 mb-4">Academic Information</h3>
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+        <motion.div variants={itemVariants} className="bg-white shadow rounded-lg p-6 mb-6 border border-gray-100">
+          <h3 className="text-lg font-medium text-gray-900 mb-4 border-b border-gray-100 pb-2">Academic Information</h3>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+            
+            {/* Read-only structured data */}
+            <div>
+              <label className="block text-sm font-medium text-gray-500">Institution</label>
+              <p className="mt-1 text-sm text-gray-900 font-medium">{profile?.institution?.name || "—"}</p>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-500">Academic Unit</label>
+              <p className="mt-1 text-sm text-gray-900 font-medium">{profile?.academicUnit?.name || "—"}</p>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-500">Program</label>
+              <p className="mt-1 text-sm text-gray-900 font-medium">{profile?.program?.name || "—"}</p>
+            </div>
+
+            {/* Editable data */}
             {[
-              { label: "Roll Number", name: "rollNumber", placeholder: "23DCE043" },
-              { label: "Batch",       name: "batch",      placeholder: "2027", type: "number" },
-              { label: "CGPA",        name: "cgpa",       placeholder: "9.02", type: "number", step: "0.01" },
+              { label: "Roll Number", name: "rollNumber", type: "text" },
+              { label: "Enrollment Year", name: "enrollmentYear", type: "number" },
+              { label: "Graduation Year", name: "graduationYear", type: "number" },
+              { label: "CGPA", name: "cgpa", type: "number", step: "0.01" },
+              { label: "Active Backlogs", name: "activeBacklogs", type: "number" },
             ].map((f) => (
               <div key={f.name}>
-                <label className="block text-xs font-medium text-gray-500 mb-1">{f.label}</label>
+                <label className="block text-sm font-medium text-gray-700">{f.label}</label>
                 {editMode ? (
-                  <input type={f.type || "text"} name={f.name} value={form[f.name]}
-                    onChange={handleChange} className="input-field text-sm" placeholder={f.placeholder} step={f.step} />
+                  <input type={f.type} name={f.name} value={form[f.name]} onChange={handleChange} step={f.step}
+                    className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm transition-colors" />
                 ) : (
-                  <p className="text-sm font-semibold text-gray-800">{profile?.[f.name] || "—"}</p>
+                  <p className="mt-1 text-sm text-gray-900 font-medium">{profile?.[f.name] ?? "—"}</p>
                 )}
               </div>
             ))}
-            <div>
-              <label className="block text-xs font-medium text-gray-500 mb-1">Branch</label>
-              {editMode ? (
-                <select name="branch" value={form.branch} onChange={handleChange} className="input-field text-sm">
-                  <option value="">Select</option>
-                  {BRANCHES.map((b) => <option key={b} value={b}>{b}</option>)}
-                </select>
-              ) : (
-                <p className="text-sm font-semibold text-gray-800">{profile?.branch || "—"}</p>
-              )}
-            </div>
           </div>
-        </div>
+        </motion.div>
 
         {/* Skills */}
-        <div className="card mb-6">
-          <h3 className="font-bold text-gray-800 mb-4">Skills</h3>
-          <div className="flex flex-wrap gap-2 mb-3">
+        <motion.div variants={itemVariants} className="bg-white shadow rounded-lg p-6 mb-6 border border-gray-100">
+          <h3 className="text-lg font-medium text-gray-900 mb-4 border-b border-gray-100 pb-2">Technical Skills</h3>
+          <div className="flex flex-wrap gap-2 mb-4">
             {(editMode ? form.skills : profile?.skills || []).map((skill) => (
-              <span key={skill} className="badge badge-indigo flex items-center gap-1 text-sm px-3 py-1">
+              <span key={skill} className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-indigo-50 text-indigo-700 border border-indigo-100">
                 {skill}
                 {editMode && (
-                  <button onClick={() => removeSkill(skill)} className="ml-1 text-indigo-400 hover:text-indigo-700">✕</button>
+                  <button onClick={() => removeArrayItem("skills", skill)} className="ml-1.5 inline-flex text-indigo-400 hover:text-indigo-600 focus:outline-none">
+                    <X className="w-3.5 h-3.5" />
+                  </button>
                 )}
               </span>
             ))}
-            {(!editMode && !profile?.skills?.length) && <p className="text-sm text-gray-400">No skills added yet</p>}
+            {(!editMode && !profile?.skills?.length) && <p className="text-sm text-gray-400 italic">No skills added yet.</p>}
           </div>
+
           {editMode && (
-            <>
-              <div className="flex gap-2 mb-3">
-                <input type="text" value={skillInput} onChange={(e) => setSkillInput(e.target.value)}
-                  onKeyDown={(e) => e.key === "Enter" && addSkill(skillInput)}
-                  className="input-field text-sm flex-1" placeholder="Type a skill and press Enter" />
-                <button onClick={() => addSkill(skillInput)} className="btn-primary px-4 text-sm">Add</button>
+            <div className="space-y-4">
+              <div className="flex gap-2">
+                <input type="text" value={skillInput} onChange={(e) => setSkillInput(e.target.value)} onKeyDown={(e) => e.key === "Enter" && addArrayItem("skills", skillInput, setSkillInput)}
+                  className="block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm" placeholder="Type a skill and press Enter" />
+                <button type="button" onClick={() => addArrayItem("skills", skillInput, setSkillInput)} className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 transition-colors">
+                  Add
+                </button>
               </div>
-              <div className="flex flex-wrap gap-1.5">
+              <div className="flex flex-wrap gap-2">
                 {SKILL_SUGGESTIONS.filter((s) => !form.skills.includes(s)).map((s) => (
-                  <button key={s} onClick={() => addSkill(s)}
-                    className="px-2.5 py-1 rounded-full text-xs border border-gray-200 text-gray-500 hover:border-indigo-400 hover:text-indigo-600 transition-colors">
+                  <button key={s} type="button" onClick={() => addArrayItem("skills", s, setSkillInput)}
+                    className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium border border-gray-300 text-gray-600 hover:bg-gray-50 hover:text-indigo-600 hover:border-indigo-300 transition-colors">
                     + {s}
                   </button>
                 ))}
               </div>
-            </>
+            </div>
           )}
-        </div>
+        </motion.div>
 
-        {/* Bio & Links */}
-        <div className="card mb-6">
-          <h3 className="font-bold text-gray-800 mb-4">Bio & Links</h3>
-          <div className="space-y-4">
+        {/* Bio & Social Links */}
+        <motion.div variants={itemVariants} className="bg-white shadow rounded-lg p-6 mb-6 border border-gray-100">
+          <h3 className="text-lg font-medium text-gray-900 mb-4 border-b border-gray-100 pb-2">Bio & Social Links</h3>
+          <div className="space-y-6">
             <div>
-              <label className="block text-xs font-medium text-gray-500 mb-1">Bio</label>
+              <label className="block text-sm font-medium text-gray-700">Bio</label>
               {editMode ? (
-                <textarea name="bio" value={form.bio} onChange={handleChange}
-                  rows={3} className="input-field resize-none text-sm" placeholder="Tell others about yourself..." />
+                <textarea name="bio" value={form.bio} onChange={handleChange} rows={3}
+                  className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm resize-none transition-colors" placeholder="Tell recruiters about yourself..." />
               ) : (
-                <p className="text-sm text-gray-700">{profile?.bio || "No bio added yet."}</p>
+                <p className="mt-1 text-sm text-gray-900 bg-gray-50 p-3 rounded-md border border-gray-100 min-h-[3rem]">{profile?.bio || <span className="text-gray-400 italic">No bio provided.</span>}</p>
               )}
             </div>
-            {[
-              { label: "LinkedIn",  name: "linkedIn",  icon: "💼", placeholder: "https://linkedin.com/in/yourname" },
-              { label: "GitHub",    name: "github",    icon: "🐙", placeholder: "https://github.com/yourname" },
-              { label: "Portfolio", name: "portfolio", icon: "🌐", placeholder: "https://yourportfolio.com" },
-            ].map((link) => (
-              <div key={link.name}>
-                <label className="block text-xs font-medium text-gray-500 mb-1">{link.icon} {link.label}</label>
-                {editMode ? (
-                  <input type="url" name={link.name} value={form[link.name]} onChange={handleChange}
-                    className="input-field text-sm" placeholder={link.placeholder} />
-                ) : profile?.[link.name] ? (
-                  <a href={profile[link.name]} target="_blank" rel="noopener noreferrer"
-                    className="text-sm text-indigo-600 hover:underline">{profile[link.name]}</a>
-                ) : (
-                  <p className="text-sm text-gray-400">Not added</p>
-                )}
-              </div>
-            ))}
+            
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+              {[
+                { label: "LinkedIn", name: "linkedIn", placeholder: "https://linkedin.com/in/username" },
+                { label: "GitHub", name: "github", placeholder: "https://github.com/username" },
+                { label: "Portfolio", name: "portfolio", placeholder: "https://yourwebsite.com" },
+                { label: "Alternate Email", name: "alternateEmail", placeholder: "personal@gmail.com" },
+              ].map((link) => (
+                <div key={link.name}>
+                  <label className="block text-sm font-medium text-gray-700">{link.label}</label>
+                  {editMode ? (
+                    <input type={link.name === "alternateEmail" ? "email" : "url"} name={link.name} value={form[link.name]} onChange={handleChange}
+                      className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm transition-colors" placeholder={link.placeholder} />
+                  ) : form[link.name] ? (
+                    <a href={link.name === "alternateEmail" ? `mailto:${form[link.name]}` : form[link.name]} target="_blank" rel="noopener noreferrer" className="mt-1 block text-sm text-indigo-600 hover:text-indigo-800 hover:underline truncate">
+                      {form[link.name]}
+                    </a>
+                  ) : (
+                    <p className="mt-1 text-sm text-gray-400 italic">Not provided</p>
+                  )}
+                </div>
+              ))}
+            </div>
           </div>
-        </div>
+        </motion.div>
 
-        {/* Placement & Mentorship */}
-        <div className="card mb-6">
-          <h3 className="font-bold text-gray-800 mb-4">Placement & Mentorship</h3>
-          <div className="space-y-4">
-            <div>
-              <label className="block text-xs font-medium text-gray-500 mb-1">Placement Status</label>
-              {editMode ? (
-                <select name="placementStatus" value={form.placementStatus} onChange={handleChange} className="input-field text-sm">
-                  {PLACEMENT_STATUSES.map((s) => <option key={s.value} value={s.value}>{s.label}</option>)}
-                </select>
-              ) : (
-                <span className={`badge ${statusObj?.color || "badge-gray"}`}>{statusObj?.label}</span>
+        {/* Alumni / Mentorship Settings (Only shown if graduated or available for mentorship) */}
+        {(isAlumni || editMode || profile?.isAvailableForMentorship) && (
+          <motion.div variants={itemVariants} className="bg-white shadow rounded-lg p-6 mb-8 border border-gray-100">
+            <h3 className="text-lg font-medium text-gray-900 mb-4 border-b border-gray-100 pb-2">Professional & Mentorship Details</h3>
+            
+            {isAlumni && (
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 mb-6 pb-6 border-b border-gray-100">
+                {[
+                  { label: "Current Company", name: "currentCompany" },
+                  { label: "Current Role", name: "currentRole" },
+                  { label: "Current CTC (LPA)", name: "currentCTC", type: "number", step: "0.1" },
+                ].map((f) => (
+                  <div key={f.name}>
+                    <label className="block text-sm font-medium text-gray-700">{f.label}</label>
+                    {editMode ? (
+                      <input type={f.type || "text"} name={f.name} value={form[f.name]} onChange={handleChange} step={f.step}
+                        className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm transition-colors" />
+                    ) : (
+                      <p className="mt-1 text-sm text-gray-900 font-medium">{profile?.[f.name] || "—"}</p>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+
+            <div className="space-y-4">
+              <div className="flex items-start">
+                <div className="flex items-center h-5">
+                  <input type="checkbox" name="isAvailableForMentorship" checked={form.isAvailableForMentorship} onChange={handleChange} disabled={!editMode}
+                    className="focus:ring-indigo-500 h-4 w-4 text-indigo-600 border-gray-300 rounded disabled:opacity-60 cursor-pointer" />
+                </div>
+                <div className="ml-3 text-sm">
+                  <label className="font-medium text-gray-700">Available for Mentorship</label>
+                  <p className="text-gray-500">Allow the placement office to contact you for guiding juniors.</p>
+                </div>
+              </div>
+
+              {(form.isAvailableForMentorship || (!editMode && profile?.mentorshipTopics?.length > 0)) && (
+                <div className="mt-4 pl-7">
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Mentorship Topics</label>
+                  <div className="flex flex-wrap gap-2 mb-3">
+                    {(editMode ? form.mentorshipTopics : profile?.mentorshipTopics || []).map((topic) => (
+                      <span key={topic} className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                        {topic}
+                        {editMode && (
+                          <button onClick={() => removeArrayItem("mentorshipTopics", topic)} className="ml-1.5 inline-flex text-green-600 hover:text-green-800 focus:outline-none">
+                            <X className="w-3 h-3" />
+                          </button>
+                        )}
+                      </span>
+                    ))}
+                  </div>
+                  {editMode && (
+                    <div className="flex gap-2 max-w-sm">
+                      <input type="text" value={topicInput} onChange={(e) => setTopicInput(e.target.value)} onKeyDown={(e) => e.key === "Enter" && addArrayItem("mentorshipTopics", topicInput, setTopicInput)}
+                        className="block w-full border border-gray-300 rounded-md shadow-sm py-1.5 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm" placeholder="e.g., Resume Review" />
+                      <button type="button" onClick={() => addArrayItem("mentorshipTopics", topicInput, setTopicInput)} className="inline-flex items-center px-3 py-1.5 border border-transparent text-xs font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 transition-colors">
+                        Add
+                      </button>
+                    </div>
+                  )}
+                </div>
               )}
             </div>
-            <label className="flex items-center gap-3 cursor-pointer">
-              <input type="checkbox" name="isAvailableForMentorship" checked={form.isAvailableForMentorship}
-                onChange={handleChange} disabled={!editMode} className="accent-indigo-600 w-4 h-4" />
-              <div>
-                <p className="text-sm font-medium text-gray-700">Available for Mentorship</p>
-                <p className="text-xs text-gray-400">Allow juniors to book mock interview sessions with you</p>
-              </div>
-            </label>
-          </div>
-        </div>
-
-        <p className="text-xs text-gray-400 text-center">
-          Member since {formatDate(user?.createdAt)} · HireLoop Campus Platform
-        </p>
-      </div>
+          </motion.div>
+        )}
+      </motion.div>
     </DashboardLayout>
   );
 };

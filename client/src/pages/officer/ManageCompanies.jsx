@@ -1,365 +1,422 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
+import { motion, AnimatePresence } from "framer-motion";
 import DashboardLayout from "../../components/common/DashboardLayout";
 import Loader from "../../components/common/Loader";
-import { getCompanies, createCompany, updateCompany } from "../../services/companyService";
-import { sendDriveAlert } from "../../services/officerService";
-import { COMPANY_DOMAINS, ROUND_TYPES, BRANCHES } from "../../utils/constants";
-import { formatDate } from "../../utils/formatDate";
+import Avatar from "../../components/common/Avatar";
 import toast from "react-hot-toast";
+import { 
+  Building2, Search, Plus, MapPin, Globe, 
+  Edit2, UploadCloud, X, Loader2, Filter
+} from "lucide-react";
+import api from "../../services/api"; // Adjust depending on your service structure
 
-const EMPTY_FORM = {
-  name: "", website: "", domain: "Product", description: "",
-  headquarters: "", minCGPA: 0, skillsRequired: [],
-  eligibleBranches: [], driveStatus: "none",
-  upcomingDriveDate: "", rounds: [],
-};
+const INDUSTRIES = [
+  "Product", "Service", "FinTech", "EdTech", "HealthTech", 
+  "E-Commerce", "Consulting", "Core Engineering", 
+  "Banking & Finance", "Government / PSU", "Startup", "Other"
+];
 
 const ManageCompanies = () => {
-  const [companies, setCompanies]     = useState([]);
-  const [loading, setLoading]         = useState(true);
-  const [showForm, setShowForm]       = useState(false);
-  const [editingId, setEditingId]     = useState(null);
-  const [form, setForm]               = useState(EMPTY_FORM);
-  const [saving, setSaving]           = useState(false);
-  const [skillInput, setSkillInput]   = useState("");
-  const [alertCompanyId, setAlertCompanyId] = useState("");
-  const [alertDate, setAlertDate]     = useState("");
-  const [sendingAlert, setSendingAlert] = useState(false);
+  const [companies, setCompanies] = useState([]);
+  const [loading, setLoading] = useState(true);
+  
+  // Pagination & Filtering
+  const [page, setPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [industryFilter, setIndustryFilter] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
 
-  useEffect(() => { fetchCompanies(); }, []);
+  // Modal State
+  const [showModal, setShowModal] = useState(false);
+  const [editingCompany, setEditingCompany] = useState(null);
+
+  // Debounce search
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedSearch(searchQuery), 500);
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
+
+  useEffect(() => {
+    fetchCompanies();
+  }, [page, debouncedSearch, industryFilter]);
 
   const fetchCompanies = async () => {
     try {
       setLoading(true);
-      const res = await getCompanies({ limit: 50 });
+      const params = { page, limit: 12 };
+      if (debouncedSearch) params.search = debouncedSearch;
+      if (industryFilter) params.industry = industryFilter;
+
+      const res = await api.get("/companies", { params });
       setCompanies(res.data.data?.companies || []);
-    } catch {
+      setTotalPages(res.data.data?.totalPages || 1);
+    } catch (err) {
       toast.error("Failed to load companies");
     } finally {
       setLoading(false);
     }
   };
 
-  const handleChange = (e) => {
-    const { name, value } = e.target;
-    setForm((p) => ({ ...p, [name]: value }));
+  const handleOpenModal = (company = null) => {
+    setEditingCompany(company);
+    setShowModal(true);
   };
 
-  const toggleBranch = (b) => {
-    setForm((p) => ({
-      ...p,
-      eligibleBranches: p.eligibleBranches.includes(b)
-        ? p.eligibleBranches.filter((x) => x !== b)
-        : [...p.eligibleBranches, b],
-    }));
+  const handleCloseModal = () => {
+    setEditingCompany(null);
+    setShowModal(false);
   };
 
-  const addSkill = () => {
-    if (!skillInput.trim()) return;
-    setForm((p) => ({ ...p, skillsRequired: [...new Set([...p.skillsRequired, skillInput.trim()])] }));
-    setSkillInput("");
+  // Animation Variants
+  const containerVariants = {
+    hidden: { opacity: 0 },
+    show: { opacity: 1, transition: { staggerChildren: 0.05 } }
   };
-
-  const removeSkill = (s) =>
-    setForm((p) => ({ ...p, skillsRequired: p.skillsRequired.filter((x) => x !== s) }));
-
-  const addRound = () =>
-    setForm((p) => ({ ...p, rounds: [...p.rounds, { name: "Technical Interview", description: "", duration: "60 mins" }] }));
-
-  const updateRound = (i, key, val) => {
-    setForm((p) => {
-      const rounds = [...p.rounds];
-      rounds[i] = { ...rounds[i], [key]: val };
-      return { ...p, rounds };
-    });
-  };
-
-  const removeRound = (i) =>
-    setForm((p) => ({ ...p, rounds: p.rounds.filter((_, idx) => idx !== i) }));
-
-  const handleEdit = (company) => {
-    setForm({
-      name: company.name, website: company.website || "",
-      domain: company.domain || "Product",
-      description: company.description || "",
-      headquarters: company.headquarters || "",
-      minCGPA: company.minCGPA || 0,
-      skillsRequired: company.skillsRequired || [],
-      eligibleBranches: company.eligibleBranches || [],
-      driveStatus: company.driveStatus || "none",
-      upcomingDriveDate: company.upcomingDriveDate
-        ? new Date(company.upcomingDriveDate).toISOString().split("T")[0]
-        : "",
-      rounds: company.rounds || [],
-    });
-    setEditingId(company._id);
-    setShowForm(true);
-    window.scrollTo({ top: 0, behavior: "smooth" });
-  };
-
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    if (!form.name.trim()) return toast.error("Company name is required");
-    try {
-      setSaving(true);
-      if (editingId) {
-        const res = await updateCompany(editingId, form);
-        setCompanies((p) => p.map((c) => c._id === editingId ? res.data.data : c));
-        toast.success("Company updated ✅");
-      } else {
-        const res = await createCompany(form);
-        setCompanies((p) => [res.data.data, ...p]);
-        toast.success("Company added ✅");
-      }
-      setShowForm(false);
-      setEditingId(null);
-      setForm(EMPTY_FORM);
-    } catch (err) {
-      toast.error(err?.response?.data?.message || "Failed to save company");
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  const handleSendAlert = async () => {
-    if (!alertCompanyId || !alertDate) return toast.error("Select company and drive date");
-    try {
-      setSendingAlert(true);
-      const res = await sendDriveAlert({ companyId: alertCompanyId, driveDate: alertDate });
-      toast.success(`Alert sent to ${res.data.data.sent} students! 📧`);
-      setAlertCompanyId("");
-      setAlertDate("");
-    } catch {
-      toast.error("Failed to send alert");
-    } finally {
-      setSendingAlert(false);
-    }
+  const itemVariants = {
+    hidden: { opacity: 0, scale: 0.95, y: 10 },
+    show: { opacity: 1, scale: 1, y: 0, transition: { duration: 0.3 } }
   };
 
   return (
     <DashboardLayout>
-      <div className="page-wrapper fade-in">
-
+      <div className="max-w-7xl mx-auto py-8 px-4 sm:px-6 lg:px-8">
         {/* Header */}
-        <div className="flex flex-wrap items-start justify-between gap-4 mb-6">
+        <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 mb-8">
           <div>
-            <h1 className="section-title mb-1">Manage Companies 🏭</h1>
-            <p className="text-sm text-gray-500">Add and manage campus recruitment companies</p>
+            <div className="flex items-center gap-3 mb-2">
+              <div className="w-10 h-10 rounded-xl bg-indigo-50 flex items-center justify-center border border-indigo-100 shadow-sm">
+                <Building2 className="w-5 h-5 text-indigo-600" />
+              </div>
+              <h1 className="text-2xl md:text-3xl font-bold text-gray-900 tracking-tight">Global Company Directory</h1>
+            </div>
+            <p className="text-sm font-medium text-gray-500">
+              Manage the central database of recruiting organizations available to all institutions.
+            </p>
           </div>
-          <button
-            onClick={() => { setShowForm((p) => !p); setEditingId(null); setForm(EMPTY_FORM); }}
-            className={showForm && !editingId ? "btn-secondary" : "btn-primary"}
+          <button 
+            onClick={() => handleOpenModal()} 
+            className="bg-indigo-600 text-white font-medium text-sm px-4 py-2.5 rounded-lg hover:bg-indigo-700 transition-colors flex items-center justify-center gap-2 shadow-sm"
           >
-            {showForm && !editingId ? "✕ Cancel" : "+ Add Company"}
+            <Plus className="w-4 h-4" /> Add Company
           </button>
         </div>
 
-        {/* Drive Alert Panel */}
-        <div className="card mb-6 bg-indigo-50 border-indigo-100">
-          <h3 className="font-semibold text-indigo-800 mb-3">📧 Send Drive Alert Email</h3>
-          <p className="text-xs text-indigo-600 mb-3">Send placement drive notification to all eligible students via Brevo</p>
-          <div className="flex flex-wrap gap-3 items-end">
-            <div className="flex-1 min-w-48">
-              <label className="block text-xs font-medium text-indigo-700 mb-1">Company</label>
-              <select value={alertCompanyId} onChange={(e) => setAlertCompanyId(e.target.value)} className="input-field text-sm">
-                <option value="">Select company...</option>
-                {companies.map((c) => <option key={c._id} value={c._id}>{c.name}</option>)}
-              </select>
-            </div>
-            <div>
-              <label className="block text-xs font-medium text-indigo-700 mb-1">Drive Date</label>
-              <input type="date" value={alertDate} onChange={(e) => setAlertDate(e.target.value)}
-                className="input-field text-sm" min={new Date().toISOString().split("T")[0]} />
-            </div>
-            <button onClick={handleSendAlert} disabled={sendingAlert} className="btn-primary text-sm">
-              {sendingAlert ? "Sending..." : "📧 Send Alert"}
-            </button>
+        {/* Toolbar */}
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-4 mb-8 bg-white p-3 rounded-xl border border-gray-100 shadow-sm">
+          <div className="relative flex-1">
+            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">
+              <Search className="w-4 h-4" />
+            </span>
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => {
+                setSearchQuery(e.target.value);
+                setPage(1);
+              }}
+              placeholder="Search by company name or description..."
+              className="w-full pl-9 pr-4 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:outline-none focus:bg-white focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 transition-all"
+            />
+          </div>
+          <div className="relative min-w-[200px]">
+            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">
+              <Filter className="w-4 h-4" />
+            </span>
+            <select
+              value={industryFilter}
+              onChange={(e) => {
+                setIndustryFilter(e.target.value);
+                setPage(1);
+              }}
+              className="w-full pl-9 pr-8 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm appearance-none focus:outline-none focus:bg-white focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 transition-all"
+            >
+              <option value="">All Industries</option>
+              {INDUSTRIES.map(ind => (
+                <option key={ind} value={ind}>{ind}</option>
+              ))}
+            </select>
           </div>
         </div>
 
-        {/* Company Form */}
-        {showForm && (
-          <div className="card mb-8">
-            <h3 className="font-bold text-gray-800 mb-5">
-              {editingId ? "✏️ Edit Company" : "➕ Add New Company"}
-            </h3>
-            <form onSubmit={handleSubmit} className="space-y-5">
-
-              {/* Basic Info */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-xs font-medium text-gray-600 mb-1">Company Name *</label>
-                  <input name="name" value={form.name} onChange={handleChange}
-                    className="input-field" placeholder="TCS, Infosys, Google..." />
-                </div>
-                <div>
-                  <label className="block text-xs font-medium text-gray-600 mb-1">Website</label>
-                  <input name="website" value={form.website} onChange={handleChange}
-                    className="input-field" placeholder="https://company.com" />
-                </div>
-                <div>
-                  <label className="block text-xs font-medium text-gray-600 mb-1">Domain</label>
-                  <select name="domain" value={form.domain} onChange={handleChange} className="input-field">
-                    {COMPANY_DOMAINS.map((d) => <option key={d} value={d}>{d}</option>)}
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-xs font-medium text-gray-600 mb-1">Headquarters</label>
-                  <input name="headquarters" value={form.headquarters} onChange={handleChange}
-                    className="input-field" placeholder="Bengaluru, Mumbai..." />
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-xs font-medium text-gray-600 mb-1">Description</label>
-                <textarea name="description" value={form.description} onChange={handleChange}
-                  rows={2} className="input-field resize-none" placeholder="About the company..." />
-              </div>
-
-              {/* Drive Info */}
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                <div>
-                  <label className="block text-xs font-medium text-gray-600 mb-1">Drive Status</label>
-                  <select name="driveStatus" value={form.driveStatus} onChange={handleChange} className="input-field">
-                    {["none","upcoming","ongoing","completed"].map((s) => (
-                      <option key={s} value={s} className="capitalize">{s}</option>
-                    ))}
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-xs font-medium text-gray-600 mb-1">Drive Date</label>
-                  <input type="date" name="upcomingDriveDate" value={form.upcomingDriveDate}
-                    onChange={handleChange} className="input-field" />
-                </div>
-                <div>
-                  <label className="block text-xs font-medium text-gray-600 mb-1">Min CGPA</label>
-                  <input type="number" name="minCGPA" value={form.minCGPA} onChange={handleChange}
-                    className="input-field" min="0" max="10" step="0.1" />
-                </div>
-              </div>
-
-              {/* Skills */}
-              <div>
-                <label className="block text-xs font-medium text-gray-600 mb-2">Required Skills</label>
-                <div className="flex gap-2 mb-2">
-                  <input value={skillInput} onChange={(e) => setSkillInput(e.target.value)}
-                    onKeyDown={(e) => e.key === "Enter" && (e.preventDefault(), addSkill())}
-                    className="input-field text-sm flex-1" placeholder="Type skill and press Enter" />
-                  <button type="button" onClick={addSkill} className="btn-secondary text-sm px-3">Add</button>
-                </div>
-                <div className="flex flex-wrap gap-1.5">
-                  {form.skillsRequired.map((s) => (
-                    <span key={s} className="badge badge-indigo text-xs flex items-center gap-1">
-                      {s}
-                      <button type="button" onClick={() => removeSkill(s)} className="text-indigo-400 hover:text-indigo-700">✕</button>
-                    </span>
-                  ))}
-                </div>
-              </div>
-
-              {/* Eligible Branches */}
-              <div>
-                <label className="block text-xs font-medium text-gray-600 mb-2">Eligible Branches</label>
-                <div className="flex flex-wrap gap-2">
-                  {BRANCHES.map((b) => (
-                    <button key={b} type="button" onClick={() => toggleBranch(b)}
-                      className={`px-3 py-1 rounded-full text-xs font-medium border transition-all
-                        ${form.eligibleBranches.includes(b)
-                          ? "bg-indigo-600 text-white border-indigo-600"
-                          : "border-gray-200 text-gray-500 hover:border-indigo-300"}`}>
-                      {b}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              {/* Rounds */}
-              <div>
-                <div className="flex items-center justify-between mb-2">
-                  <label className="block text-xs font-medium text-gray-600">Interview Rounds</label>
-                  <button type="button" onClick={addRound} className="text-xs text-indigo-600 hover:underline">+ Add Round</button>
-                </div>
-                <div className="space-y-2">
-                  {form.rounds.map((round, i) => (
-                    <div key={i} className="flex gap-2 items-center p-3 bg-gray-50 rounded-lg">
-                      <select value={round.name} onChange={(e) => updateRound(i, "name", e.target.value)}
-                        className="input-field text-sm flex-1">
-                        {ROUND_TYPES.map((r) => <option key={r} value={r}>{r}</option>)}
-                      </select>
-                      <input value={round.duration} onChange={(e) => updateRound(i, "duration", e.target.value)}
-                        className="input-field text-sm w-24" placeholder="60 mins" />
-                      <button type="button" onClick={() => removeRound(i)} className="text-red-400 hover:text-red-600 text-sm flex-shrink-0">✕</button>
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              <div className="flex gap-3 pt-2">
-                <button type="button" onClick={() => { setShowForm(false); setEditingId(null); setForm(EMPTY_FORM); }}
-                  className="btn-secondary flex-1">Cancel</button>
-                <button type="submit" disabled={saving} className="btn-primary flex-1">
-                  {saving ? "Saving..." : editingId ? "Update Company" : "Add Company"}
-                </button>
-              </div>
-            </form>
-          </div>
-        )}
-
-        {/* Companies List */}
-        {loading ? (
-          <div className="flex items-center justify-center min-h-64"><Loader size="lg" /></div>
-        ) : (
-          <div className="card overflow-hidden p-0">
-            <div className="px-5 py-3 border-b border-gray-100 bg-gray-50">
-              <p className="text-sm font-medium text-gray-600">{companies.length} companies</p>
+        {/* Content */}
+        <div className="min-h-[50vh]">
+          {loading && companies.length === 0 ? (
+            <div className="flex items-center justify-center h-64">
+              <Loader text="Loading directory..." />
             </div>
-            <div className="overflow-x-auto">
-              <table className="w-full">
-                <thead>
-                  <tr className="border-b border-gray-100">
-                    {["Company","Domain","Drive Status","Drive Date","Min CGPA","Actions"].map((h) => (
-                      <th key={h} className="text-left text-xs font-semibold text-gray-500 px-5 py-3">{h}</th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-50">
-                  {companies.map((company) => (
-                    <tr key={company._id} className="hover:bg-gray-50 transition-colors">
-                      <td className="px-5 py-3">
-                        <div className="flex items-center gap-2.5">
-                          <div className="w-8 h-8 rounded-lg bg-indigo-100 flex items-center justify-center text-indigo-700 font-bold text-xs">
-                            {company.name?.[0]}
-                          </div>
-                          <span className="text-sm font-medium text-gray-800">{company.name}</span>
+          ) : companies.length === 0 ? (
+            <div className="bg-white border border-gray-100 rounded-2xl shadow-sm flex flex-col items-center justify-center p-16 text-center">
+              <div className="w-16 h-16 bg-gray-50 rounded-full flex items-center justify-center mb-4 border border-gray-100">
+                <Building2 className="w-8 h-8 text-gray-300" />
+              </div>
+              <h3 className="text-lg font-bold text-gray-900 mb-1">No Companies Found</h3>
+              <p className="text-sm text-gray-500 max-w-sm mx-auto">
+                No organizations match your search or filter criteria. Add a new company to expand the directory.
+              </p>
+            </div>
+          ) : (
+            <>
+              <motion.div 
+                variants={containerVariants}
+                initial="hidden"
+                animate="show"
+                className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6"
+              >
+                {companies.map((company) => (
+                  <motion.div 
+                    key={company._id} 
+                    variants={itemVariants}
+                    className="bg-white rounded-xl border border-gray-100 shadow-sm hover:shadow-md transition-all flex flex-col group overflow-hidden"
+                  >
+                    <div className="p-5 flex-1">
+                      <div className="flex justify-between items-start mb-4">
+                        <div className="w-14 h-14 rounded-xl bg-gray-50 border border-gray-100 flex items-center justify-center overflow-hidden flex-shrink-0">
+                          {company.logo ? (
+                            <img src={company.logo} alt={`${company.name} logo`} className="w-full h-full object-contain p-2" />
+                          ) : (
+                            <Building2 className="w-6 h-6 text-gray-300" />
+                          )}
                         </div>
-                      </td>
-                      <td className="px-4 py-3 text-sm text-gray-500">{company.domain}</td>
-                      <td className="px-4 py-3">
-                        <span className={`badge text-xs capitalize ${
-                          company.driveStatus === "upcoming"  ? "badge-indigo" :
-                          company.driveStatus === "ongoing"   ? "badge-green"  :
-                          company.driveStatus === "completed" ? "badge-gray"   : "badge-gray"
-                        }`}>{company.driveStatus}</span>
-                      </td>
-                      <td className="px-4 py-3 text-xs text-gray-500">
-                        {company.upcomingDriveDate ? formatDate(company.upcomingDriveDate) : "—"}
-                      </td>
-                      <td className="px-4 py-3 text-sm text-gray-500">{company.minCGPA || "—"}</td>
-                      <td className="px-4 py-3">
-                        <button onClick={() => handleEdit(company)}
-                          className="text-xs text-indigo-600 hover:underline font-medium">
-                          Edit
+                        <button
+                          onClick={() => handleOpenModal(company)}
+                          className="p-1.5 text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors opacity-0 group-hover:opacity-100"
+                          title="Edit Company"
+                        >
+                          <Edit2 className="w-4 h-4" />
                         </button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        )}
+                      </div>
+                      
+                      <h3 className="text-lg font-bold text-gray-900 mb-1 truncate" title={company.name}>
+                        {company.name}
+                      </h3>
+                      <span className="inline-block px-2.5 py-0.5 rounded text-[10px] font-bold bg-indigo-50 text-indigo-700 uppercase tracking-wider mb-3">
+                        {company.industry}
+                      </span>
+                      
+                      <p className="text-sm text-gray-600 line-clamp-2 mb-4 h-10">
+                        {company.description || "No description provided."}
+                      </p>
+
+                      <div className="space-y-2">
+                        {company.headquarters && (
+                          <div className="flex items-center text-xs text-gray-500 font-medium">
+                            <MapPin className="w-3.5 h-3.5 mr-2 text-gray-400" />
+                            <span className="truncate">{company.headquarters}</span>
+                          </div>
+                        )}
+                        {company.website && (
+                          <div className="flex items-center text-xs text-gray-500 font-medium">
+                            <Globe className="w-3.5 h-3.5 mr-2 text-gray-400" />
+                            <a href={company.website} target="_blank" rel="noopener noreferrer" className="hover:text-indigo-600 hover:underline truncate">
+                              {company.website.replace(/^https?:\/\//, '')}
+                            </a>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </motion.div>
+                ))}
+              </motion.div>
+
+              {/* Pagination Controls */}
+              {totalPages > 1 && (
+                <div className="flex items-center justify-center gap-2 mt-8">
+                  <button
+                    onClick={() => setPage(p => Math.max(1, p - 1))}
+                    disabled={page === 1}
+                    className="px-3 py-1.5 rounded-md border border-gray-200 text-sm font-medium text-gray-600 hover:bg-gray-50 disabled:opacity-50"
+                  >
+                    Previous
+                  </button>
+                  <span className="text-sm font-medium text-gray-600 px-4">
+                    Page {page} of {totalPages}
+                  </span>
+                  <button
+                    onClick={() => setPage(p => Math.min(totalPages, p + 1))}
+                    disabled={page === totalPages}
+                    className="px-3 py-1.5 rounded-md border border-gray-200 text-sm font-medium text-gray-600 hover:bg-gray-50 disabled:opacity-50"
+                  >
+                    Next
+                  </button>
+                </div>
+              )}
+            </>
+          )}
+        </div>
       </div>
+
+      {/* Company Modal */}
+      <AnimatePresence>
+        {showModal && (
+          <CompanyModal 
+            company={editingCompany} 
+            onClose={handleCloseModal}
+            onSuccess={() => {
+              handleCloseModal();
+              fetchCompanies();
+            }}
+          />
+        )}
+      </AnimatePresence>
     </DashboardLayout>
+  );
+};
+
+/* ── Company Form & Logo Upload Modal ────────────────────────────────────── */
+const CompanyModal = ({ company, onClose, onSuccess }) => {
+  const [loading, setLoading] = useState(false);
+  const [uploadingLogo, setUploadingLogo] = useState(false);
+  const fileInputRef = useRef(null);
+  
+  const [formData, setForm] = useState({
+    name: company?.name || "",
+    industry: company?.industry || "Other",
+    website: company?.website || "",
+    headquarters: company?.headquarters || "",
+    description: company?.description || "",
+  });
+
+  const handleChange = (e) => setForm({ ...formData, [e.target.name]: e.target.value });
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    try {
+      setLoading(true);
+      if (company) {
+        await api.put(`/companies/${company._id}`, formData);
+        toast.success("Company updated successfully!");
+      } else {
+        await api.post("/companies", formData);
+        toast.success("Company added to directory!");
+      }
+      onSuccess();
+    } catch (err) {
+      toast.error(err?.response?.data?.message || "Failed to save company");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleLogoUpload = async (e) => {
+    const file = e.target.files[0];
+    if (!file || !company) return; // Must create company before uploading logo
+    
+    const fd = new FormData();
+    fd.append("image", file); // Depending on your uploadMiddleware field name, usually 'image' or 'logo'
+    
+    try {
+      setUploadingLogo(true);
+      await api.post(`/companies/${company._id}/logo`, fd, {
+        headers: { "Content-Type": "multipart/form-data" }
+      });
+      toast.success("Logo uploaded successfully!");
+      onSuccess();
+    } catch (err) {
+      toast.error("Failed to upload logo");
+    } finally {
+      setUploadingLogo(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-gray-900/60 backdrop-blur-sm">
+      <motion.div 
+        initial={{ opacity: 0, scale: 0.95, y: 20 }}
+        animate={{ opacity: 1, scale: 1, y: 0 }}
+        exit={{ opacity: 0, scale: 0.95, y: 20 }}
+        className="bg-white rounded-2xl shadow-xl w-full max-w-2xl overflow-hidden flex flex-col max-h-[90vh]"
+      >
+        <div className="flex justify-between items-center p-5 border-b border-gray-100 bg-gray-50 flex-shrink-0">
+          <h3 className="text-lg font-bold text-gray-900">
+            {company ? "Edit Company Details" : "Add New Company"}
+          </h3>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 transition-colors p-1 rounded-md hover:bg-gray-200">
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+        
+        <div className="flex-1 overflow-y-auto p-6">
+          {company && (
+            <div className="flex items-center gap-5 mb-6 p-4 bg-gray-50 rounded-xl border border-gray-100">
+              <div className="w-16 h-16 rounded-xl bg-white border border-gray-200 flex items-center justify-center overflow-hidden">
+                {company.logo ? (
+                  <img src={company.logo} alt="logo" className="w-full h-full object-contain p-2" />
+                ) : (
+                  <Building2 className="w-6 h-6 text-gray-300" />
+                )}
+              </div>
+              <div>
+                <p className="text-sm font-bold text-gray-900 mb-1">Company Logo</p>
+                <button 
+                  type="button"
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={uploadingLogo}
+                  className="inline-flex items-center text-xs font-semibold text-indigo-600 hover:text-indigo-800 transition-colors disabled:opacity-50"
+                >
+                  {uploadingLogo ? <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" /> : <UploadCloud className="w-3.5 h-3.5 mr-1.5" />}
+                  {uploadingLogo ? "Uploading..." : "Upload New Logo"}
+                </button>
+                <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={handleLogoUpload} />
+              </div>
+            </div>
+          )}
+
+          {!company && (
+            <div className="mb-6 p-3 bg-blue-50 border border-blue-100 rounded-lg text-sm text-blue-700">
+              <span className="font-semibold">Note:</span> You can upload the company logo after saving the initial details.
+            </div>
+          )}
+
+          <form id="company-form" onSubmit={handleSubmit} className="space-y-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Company Name *</label>
+                <input required type="text" name="name" value={formData.name} onChange={handleChange} className="w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm" placeholder="e.g. Google" />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Industry</label>
+                <select name="industry" value={formData.industry} onChange={handleChange} className="w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm">
+                  {INDUSTRIES.map(ind => <option key={ind} value={ind}>{ind}</option>)}
+                </select>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Website URL</label>
+                <input type="url" name="website" value={formData.website} onChange={handleChange} className="w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm" placeholder="https://..." />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Headquarters</label>
+                <input type="text" name="headquarters" value={formData.headquarters} onChange={handleChange} className="w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm" placeholder="City, Country" />
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Description</label>
+              <textarea 
+                name="description" 
+                value={formData.description} 
+                onChange={handleChange} 
+                rows={4}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm resize-none" 
+                placeholder="Brief overview of the company..."
+              />
+            </div>
+          </form>
+        </div>
+
+        <div className="p-5 border-t border-gray-100 bg-gray-50 flex justify-end gap-3 flex-shrink-0">
+          <button type="button" onClick={onClose} className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-100 transition-colors">
+            Cancel
+          </button>
+          <button type="submit" form="company-form" disabled={loading} className="px-6 py-2 text-sm font-bold text-white bg-indigo-600 rounded-lg shadow-sm hover:bg-indigo-700 transition-colors disabled:opacity-70 flex items-center">
+            {loading && <Loader2 className="w-4 h-4 mr-2 animate-spin" />} {company ? "Save Changes" : "Add Company"}
+          </button>
+        </div>
+      </motion.div>
+    </div>
   );
 };
 

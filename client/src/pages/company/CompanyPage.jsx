@@ -4,19 +4,18 @@ import DashboardLayout from "../../components/common/DashboardLayout";
 import CompanyDetail from "../../components/company/CompanyDetail";
 import ExperienceCard from "../../components/experience/ExperienceCard";
 import Loader from "../../components/common/Loader";
-import { getCompany } from "../../services/companyService";
+import { getCompany, getCompanyDrives } from "../../services/companyService";
 import { getByCompany } from "../../services/experienceService";
-import { addApplication } from "../../services/studentService";
-import { useAuth } from '../../hooks/useAuth';
+import { addApplication } from "../../services/memberService";
 import toast from "react-hot-toast";
 import { Building2, ArrowLeft, ClipboardList, FileText, Loader2 } from "lucide-react";
 
 const TABS = ["Overview", "Experiences", "Apply"];
 
 const CompanyPage = () => {
-  const { id }    = useParams();
-  const { user }  = useAuth();
+  const { id } = useParams();
   const [company, setCompany]         = useState(null);
+  const [drives, setDrives]           = useState([]);
   const [experiences, setExperiences] = useState([]);
   const [loading, setLoading]         = useState(true);
   const [activeTab, setActiveTab]     = useState("Overview");
@@ -27,12 +26,14 @@ const CompanyPage = () => {
     const fetchAll = async () => {
       try {
         setLoading(true);
-        const [compRes, expRes] = await Promise.allSettled([
+        const [compRes, driveRes, expRes] = await Promise.allSettled([
           getCompany(id),
+          getCompanyDrives(id),
           getByCompany(id),
         ]);
-        if (compRes.status === "fulfilled") setCompany(compRes.value.data.data);
-        if (expRes.status  === "fulfilled") setExperiences(expRes.value.data.data || []);
+        if (compRes.status  === "fulfilled") setCompany(compRes.value.data.data);
+        if (driveRes.status === "fulfilled") setDrives(driveRes.value.data.data || []);
+        if (expRes.status   === "fulfilled") setExperiences(expRes.value.data.data || []);
       } catch {
         toast.error("Failed to load company");
       } finally {
@@ -76,6 +77,8 @@ const CompanyPage = () => {
     </DashboardLayout>
   );
 
+  const upcomingDrive = drives.find((d) => d.status === "UPCOMING" || d.status === "ACTIVE");
+
   return (
     <DashboardLayout>
       <div className="max-w-7xl mx-auto animate-in fade-in duration-500">
@@ -101,14 +104,11 @@ const CompanyPage = () => {
               )}
               <div>
                 <h1 className="text-2xl md:text-3xl font-bold text-gray-900 tracking-tight mb-1">{company.name}</h1>
-                <p className="text-gray-500 font-medium">{company.domain} · {company.headquarters || "India"}</p>
+                <p className="text-gray-500 font-medium">{company.industry || "Other"} · {company.headquarters || "India"}</p>
                 <div className="flex flex-wrap items-center gap-3 mt-3">
-                  {company.driveStatus !== "none" && (
-                    <span className={`badge uppercase tracking-wider font-bold shadow-sm ${
-                      company.driveStatus === "upcoming" ? "bg-indigo-50 text-indigo-700 border border-indigo-100" :
-                      company.driveStatus === "ongoing"  ? "bg-green-50 text-green-700 border border-green-100" : "badge-gray"
-                    }`}>
-                      {company.driveStatus}
+                  {upcomingDrive && (
+                    <span className="badge uppercase tracking-wider font-bold shadow-sm bg-indigo-50 text-indigo-700 border border-indigo-100">
+                      {upcomingDrive.status === "ACTIVE" ? "Drive Active" : "Drive Upcoming"}
                     </span>
                   )}
                   <span className="text-xs font-semibold text-gray-400 uppercase tracking-wider flex items-center gap-1.5 bg-gray-50 px-2.5 py-1 rounded-md">
@@ -147,7 +147,7 @@ const CompanyPage = () => {
 
         {/* Tab Content */}
         <div className="min-h-[40vh]">
-          {activeTab === "Overview" && <CompanyDetail company={company} />}
+          {activeTab === "Overview" && <CompanyDetail company={company} drives={drives} />}
 
           {activeTab === "Experiences" && (
             <div className="animate-in fade-in duration-300">
@@ -167,7 +167,7 @@ const CompanyPage = () => {
                   <p className="text-sm font-medium">Be the first to share your experience with {company.name}!</p>
                 </div>
               ) : (
-                <div className="space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   {experiences.map((exp) => (
                     <ExperienceCard key={exp._id} experience={exp} />
                   ))}
@@ -184,10 +184,10 @@ const CompanyPage = () => {
                 </div>
                 <h2 className="font-bold text-gray-900 text-xl">Track Application</h2>
               </div>
-              <p className="text-sm font-medium text-gray-500 mb-8 ml-13">
+              <p className="text-sm font-medium text-gray-500 mb-8">
                 Add this company to your Journey Tracker to monitor your progress.
               </p>
-              
+
               <form onSubmit={handleQuickApply} className="space-y-5">
                 <div>
                   <label className="block text-sm font-semibold text-gray-700 mb-1.5">

@@ -3,30 +3,22 @@ import DashboardLayout from "../../components/common/DashboardLayout";
 import CompanyCard from "../../components/company/CompanyCard";
 import Loader from "../../components/common/Loader";
 import { getCompanies } from "../../services/companyService";
-import { COMPANY_DOMAINS } from "../../utils/constants";
+import { COMPANY_INDUSTRIES } from "../../utils/constants";
 import toast from "react-hot-toast";
 import { Search, X, Building2, ChevronLeft, ChevronRight } from "lucide-react";
 
-const DRIVE_FILTERS = [
-  { label: "All",       value: ""          },
-  { label: "Upcoming",  value: "upcoming"  },
-  { label: "Ongoing",   value: "ongoing"   },
-  { label: "Completed", value: "completed" },
-];
-
 const CompanyList = () => {
-  const [companies, setCompanies]   = useState([]);
-  const [loading, setLoading]       = useState(true);
-  const [total, setTotal]           = useState(0);
-  const [page, setPage]             = useState(1);
-  const [search, setSearch]         = useState("");
-  const [domain, setDomain]         = useState("");
-  const [driveStatus, setDriveStatus] = useState("");
+  const [companies, setCompanies] = useState([]);
+  const [loading, setLoading]     = useState(true);
+  const [total, setTotal]         = useState(0);
+  const [page, setPage]           = useState(1);
+  const [search, setSearch]       = useState("");
+  const [industry, setIndustry]   = useState("");
 
   const fetchCompanies = useCallback(async () => {
     try {
       setLoading(true);
-      const res = await getCompanies({ page, limit: 12, domain, driveStatus, search });
+      const res = await getCompanies({ page, limit: 12, industry, search });
       setCompanies(res.data.data?.companies || []);
       setTotal(res.data.data?.total || 0);
     } catch {
@@ -34,14 +26,14 @@ const CompanyList = () => {
     } finally {
       setLoading(false);
     }
-  }, [page, domain, driveStatus, search]);
+  }, [page, industry, search]);
 
   useEffect(() => {
     const timer = setTimeout(fetchCompanies, search ? 400 : 0);
     return () => clearTimeout(timer);
   }, [fetchCompanies, search]);
 
-  useEffect(() => { setPage(1); }, [search, domain, driveStatus]);
+  useEffect(() => { setPage(1); }, [search, industry]);
 
   return (
     <DashboardLayout>
@@ -49,9 +41,9 @@ const CompanyList = () => {
 
         {/* Header */}
         <div className="mb-8">
-          <h1 className="text-2xl md:text-3xl font-bold text-gray-900 tracking-tight mb-1.5">Company Intelligence Hub</h1>
+          <h1 className="text-2xl md:text-3xl font-bold text-gray-900 tracking-tight mb-1.5">Company Directory</h1>
           <p className="text-sm font-medium text-gray-500">
-            Browse companies, analyze round details, and find your perfect match.
+            Browse companies on the platform and explore their placement drives at your college.
           </p>
         </div>
 
@@ -72,39 +64,22 @@ const CompanyList = () => {
               />
             </div>
 
-            {/* Domain filter */}
+            {/* Industry filter */}
             <select
-              value={domain}
-              onChange={(e) => setDomain(e.target.value)}
-              className="px-4 py-2 bg-gray-50 border border-transparent rounded-lg text-sm font-medium text-gray-700 focus:outline-none focus:bg-white focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 transition-all min-w-[140px]"
+              value={industry}
+              onChange={(e) => setIndustry(e.target.value)}
+              className="px-4 py-2 bg-gray-50 border border-transparent rounded-lg text-sm font-medium text-gray-700 focus:outline-none focus:bg-white focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 transition-all min-w-[160px]"
             >
-              <option value="">All Domains</option>
-              {COMPANY_DOMAINS.map((d) => (
-                <option key={d} value={d}>{d}</option>
+              <option value="">All Industries</option>
+              {COMPANY_INDUSTRIES.map((i) => (
+                <option key={i} value={i}>{i}</option>
               ))}
             </select>
 
-            {/* Drive status tabs */}
-            <div className="flex items-center bg-gray-50 border border-gray-100 rounded-lg p-1">
-              {DRIVE_FILTERS.map((f) => (
-                <button
-                  key={f.value}
-                  onClick={() => setDriveStatus(f.value)}
-                  className={`px-4 py-1.5 rounded-md text-sm font-semibold transition-all duration-200
-                    ${driveStatus === f.value
-                      ? "bg-white text-gray-900 shadow-sm border border-gray-200"
-                      : "text-gray-500 hover:text-gray-900"
-                    }`}
-                >
-                  {f.label}
-                </button>
-              ))}
-            </div>
-
             {/* Clear filters */}
-            {(search || domain || driveStatus) && (
+            {(search || industry) && (
               <button
-                onClick={() => { setSearch(""); setDomain(""); setDriveStatus(""); }}
+                onClick={() => { setSearch(""); setIndustry(""); }}
                 className="text-sm font-semibold text-gray-400 hover:text-red-600 transition-colors flex items-center gap-1 px-2"
               >
                 <X className="w-4 h-4" /> Clear

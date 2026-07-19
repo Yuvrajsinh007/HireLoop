@@ -1,171 +1,128 @@
+import { Globe, MapPin, Calendar, Users, IndianRupee, GraduationCap } from "lucide-react";
 import RoundBadge from "./RoundBadge";
 import SkillTag from "./SkillTag";
 import { formatDate } from "../../utils/formatDate";
-import { Star, Globe, Calendar, CheckCircle2, CircleDot, Building2, MapPin, GraduationCap, Code } from "lucide-react";
 
-const CompanyDetail = ({ company }) => {
-  const rating = Math.round(company.difficultyRating || 0);
+const DRIVE_STATUS_COLORS = {
+  UPCOMING:  "bg-indigo-50 text-indigo-700 border-indigo-100",
+  ACTIVE:    "bg-emerald-50 text-emerald-700 border-emerald-100",
+  COMPLETED: "bg-gray-50 text-gray-600 border-gray-200",
+  CANCELLED: "bg-red-50 text-red-700 border-red-100",
+};
+
+const CompanyDetail = ({ company, drives = [] }) => {
+  const allSkills = [...new Set(drives.flatMap((d) => d.skillsRequired || []))];
 
   return (
-    <div className="space-y-6 animate-in fade-in duration-300">
-      {/* Overview */}
-      <div className="bg-white rounded-2xl p-6 border border-gray-100 shadow-sm">
-        <h2 className="font-bold text-gray-900 mb-4 text-lg flex items-center gap-2">
-          <Building2 className="w-5 h-5 text-brand-600" /> Company Overview
-        </h2>
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-          {[
-            { label: "Domain",    value: company.domain || "—",                       icon: Globe },
-            { label: "Avg CTC",   value: company.averageCTC ? `${company.averageCTC} LPA` : "—", icon: CircleDot },
-            { label: "Min CGPA",  value: company.minCGPA > 0 ? `${company.minCGPA}+` : "—",      icon: GraduationCap },
-            { label: "HQ",        value: company.headquarters || "—",                 icon: MapPin },
-          ].map((item) => (
-            <div key={item.label} className="flex flex-col items-center justify-center p-4 bg-gray-50 rounded-xl border border-gray-100">
-              <item.icon className="w-4 h-4 text-gray-400 mb-2" />
-              <p className="font-bold text-gray-900 text-sm">{item.value}</p>
-              <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mt-1">{item.label}</p>
-            </div>
-          ))}
-        </div>
-
-        {company.description && (
-          <p className="text-sm text-gray-600 mt-6 leading-relaxed font-medium bg-gray-50 p-4 rounded-xl border border-gray-100">
+    <div className="space-y-8 animate-in fade-in duration-300">
+      {/* About */}
+      <div className="bg-white rounded-2xl p-6 md:p-8 border border-gray-100 shadow-sm">
+        <h2 className="font-bold text-gray-900 text-lg mb-4">About {company.name}</h2>
+        {company.description ? (
+          <p className="text-sm text-gray-600 leading-relaxed font-medium mb-6 whitespace-pre-wrap">
             {company.description}
           </p>
+        ) : (
+          <p className="text-sm text-gray-400 italic mb-6">No description added yet.</p>
         )}
 
-        {company.website && (
-          <a
-            href={company.website}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="inline-flex items-center gap-2 text-brand-600 font-semibold text-sm mt-5 hover:text-brand-700 transition-colors bg-brand-50 px-4 py-2 rounded-lg"
-          >
-            <Globe className="w-4 h-4" /> Visit Website
-          </a>
-        )}
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-xl border border-gray-100">
+            <Globe className="w-4 h-4 text-gray-400 shrink-0" />
+            {company.website ? (
+              <a href={company.website} target="_blank" rel="noreferrer" className="text-sm font-semibold text-brand-600 truncate hover:underline">
+                {company.website.replace(/^https?:\/\//, "")}
+              </a>
+            ) : (
+              <span className="text-sm font-medium text-gray-400">No website listed</span>
+            )}
+          </div>
+          <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-xl border border-gray-100">
+            <MapPin className="w-4 h-4 text-gray-400 shrink-0" />
+            <span className="text-sm font-semibold text-gray-700 truncate">{company.headquarters || "Not specified"}</span>
+          </div>
+          <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-xl border border-gray-100">
+            <Users className="w-4 h-4 text-gray-400 shrink-0" />
+            <span className="text-sm font-semibold text-gray-700 truncate">{company.industry || "Other"}</span>
+          </div>
+        </div>
       </div>
 
-      {/* Drive Info */}
-      {company.driveStatus !== "none" && (
-        <div className={`rounded-2xl p-6 border shadow-sm flex flex-col md:flex-row items-start md:items-center justify-between gap-4 ${
-          company.driveStatus === "upcoming" ? "border-brand-200 bg-brand-50" : "border-emerald-200 bg-emerald-50"
-        }`}>
-          <div className="flex items-center gap-3">
-            <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${company.driveStatus === "upcoming" ? "bg-white text-brand-600 shadow-sm" : "bg-white text-emerald-600 shadow-sm"}`}>
-              {company.driveStatus === "upcoming" ? <Calendar className="w-6 h-6" /> : <CheckCircle2 className="w-6 h-6" />}
-            </div>
-            <div>
-              <h3 className="font-bold text-gray-900">
-                {company.driveStatus === "upcoming" ? "Upcoming Placement Drive" : "Active Placement Drive"}
-              </h3>
-              <span className={`inline-block mt-1 text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded border ${
-                company.driveStatus === "upcoming" ? "bg-brand-100 text-brand-700 border-brand-200" :
-                "bg-emerald-100 text-emerald-700 border-emerald-200"
-              }`}>
-                {company.driveStatus}
-              </span>
-            </div>
+      {/* Skills across all drives */}
+      {allSkills.length > 0 && (
+        <div className="bg-white rounded-2xl p-6 md:p-8 border border-gray-100 shadow-sm">
+          <h2 className="font-bold text-gray-900 text-lg mb-4">Skills Typically Required</h2>
+          <div className="flex flex-wrap gap-2">
+            {allSkills.map((s) => <SkillTag key={s} skill={s} />)}
           </div>
-          {company.upcomingDriveDate && (
-            <div className="bg-white px-4 py-2.5 rounded-lg border border-gray-100 shadow-sm">
-              <p className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-0.5">Scheduled Date</p>
-              <p className="text-sm font-bold text-gray-900">{formatDate(company.upcomingDriveDate)}</p>
-            </div>
-          )}
         </div>
       )}
 
-      {/* Eligibility */}
-      {(company.eligibleBranches?.length > 0 || company.skillsRequired?.length > 0) && (
-        <div className="bg-white rounded-2xl p-6 border border-gray-100 shadow-sm">
-          <h2 className="font-bold text-gray-900 mb-5 text-lg flex items-center gap-2">
-            <Code className="w-5 h-5 text-brand-600" /> Eligibility & Skills
-          </h2>
+      {/* Drives at your college */}
+      <div className="bg-white rounded-2xl p-6 md:p-8 border border-gray-100 shadow-sm">
+        <h2 className="font-bold text-gray-900 text-lg mb-4">Placement Drives at Your College</h2>
 
-          {company.eligibleBranches?.length > 0 && (
-            <div className="mb-6">
-              <p className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-3">Eligible Branches</p>
-              <div className="flex flex-wrap gap-2">
-                {company.eligibleBranches.map((b) => (
-                  <span key={b} className="px-3 py-1.5 bg-emerald-50 text-emerald-700 border border-emerald-100 rounded-lg text-xs font-bold shadow-sm">
-                    {b}
+        {drives.length === 0 ? (
+          <p className="text-sm text-gray-400 italic">No drives have been recorded for this company at your institution yet.</p>
+        ) : (
+          <div className="space-y-6">
+            {drives.map((drive) => (
+              <div key={drive._id} className="border border-gray-100 rounded-xl p-5">
+                <div className="flex flex-wrap items-center justify-between gap-2 mb-4">
+                  <h3 className="font-bold text-gray-900">{drive.title}</h3>
+                  <span className={`px-2.5 py-1 rounded-md text-[10px] font-bold uppercase tracking-wider border shadow-sm ${DRIVE_STATUS_COLORS[drive.status] || "bg-gray-50 text-gray-500 border-gray-200"}`}>
+                    {drive.status}
                   </span>
-                ))}
-              </div>
-            </div>
-          )}
+                </div>
 
-          {company.skillsRequired?.length > 0 && (
-            <div>
-              <p className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-3">Required Skills</p>
-              <div className="flex flex-wrap gap-2">
-                {company.skillsRequired.map((s) => (
-                  <SkillTag key={s} skill={s} size="lg" />
-                ))}
-              </div>
-            </div>
-          )}
-        </div>
-      )}
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-5">
+                  {drive.driveDate && (
+                    <div className="flex items-center gap-1.5 text-xs font-semibold text-gray-500">
+                      <Calendar className="w-3.5 h-3.5 text-gray-400" /> {formatDate(drive.driveDate)}
+                    </div>
+                  )}
+                  {drive.minCGPA > 0 && (
+                    <div className="flex items-center gap-1.5 text-xs font-semibold text-gray-500">
+                      <GraduationCap className="w-3.5 h-3.5 text-gray-400" /> CGPA {drive.minCGPA}+
+                    </div>
+                  )}
+                  {drive.roles?.[0]?.ctcTotal && (
+                    <div className="flex items-center gap-1.5 text-xs font-semibold text-emerald-600">
+                      <IndianRupee className="w-3.5 h-3.5" /> {drive.roles[0].ctcTotal} LPA
+                    </div>
+                  )}
+                  {drive.totalSelected > 0 && (
+                    <div className="flex items-center gap-1.5 text-xs font-semibold text-gray-500">
+                      <Users className="w-3.5 h-3.5 text-gray-400" /> {drive.totalSelected} selected
+                    </div>
+                  )}
+                </div>
 
-      {/* Rounds */}
-      {company.rounds?.length > 0 && (
-        <div className="bg-white rounded-2xl p-6 border border-gray-100 shadow-sm">
-          <h2 className="font-bold text-gray-900 mb-5 text-lg">Interview Rounds <span className="text-gray-400 font-medium">({company.rounds.length})</span></h2>
-          <div className="space-y-4">
-            {company.rounds.map((round, i) => (
-              <RoundBadge key={i} round={round} index={i} />
+                {drive.roles?.length > 0 && (
+                  <div className="mb-5">
+                    <p className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">Roles Offered</p>
+                    <div className="flex flex-wrap gap-2">
+                      {drive.roles.map((r, i) => (
+                        <span key={i} className="px-3 py-1.5 bg-gray-50 border border-gray-200 rounded-lg text-xs font-bold text-gray-700">
+                          {r.title} {r.ctcTotal ? `· ${r.ctcTotal} LPA` : ""}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {drive.rounds?.length > 0 && (
+                  <div>
+                    <p className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-3">Selection Process</p>
+                    <div className="space-y-2">
+                      {drive.rounds.map((round, i) => (
+                        <RoundBadge key={i} round={round} index={i} />
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
             ))}
-          </div>
-        </div>
-      )}
-
-      {/* Grid for Difficulty and Visit History */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Difficulty */}
-        <div className="bg-white rounded-2xl p-6 border border-gray-100 shadow-sm lg:col-span-1">
-          <h2 className="font-bold text-gray-900 mb-4 text-lg">Difficulty Rating</h2>
-          <div className="flex flex-col items-center justify-center p-6 bg-gray-50 rounded-xl border border-gray-100">
-            <span className="text-4xl font-extrabold text-gray-900 mb-2">{company.difficultyRating?.toFixed(1) || "0.0"}</span>
-            <div className="flex items-center gap-1 mb-2">
-              {Array.from({ length: 5 }).map((_, i) => (
-                <Star key={i} className={`w-5 h-5 ${i < rating ? "fill-amber-400 text-amber-400" : "fill-gray-200 text-gray-200"}`} />
-              ))}
-            </div>
-            <span className="text-xs font-bold text-gray-400 uppercase tracking-wider">{company.totalRatings} ratings</span>
-          </div>
-        </div>
-
-        {/* Visit History */}
-        {company.visitHistory?.length > 0 && (
-          <div className="bg-white rounded-2xl p-6 border border-gray-100 shadow-sm lg:col-span-2">
-            <h2 className="font-bold text-gray-900 mb-4 text-lg">Visit History</h2>
-            <div className="overflow-x-auto">
-              <table className="w-full text-left border-collapse">
-                <thead>
-                  <tr className="bg-gray-50/80 border-b border-gray-100">
-                    {["Year", "Selected", "CTC Offered", "Roles"].map((h) => (
-                      <th key={h} className="px-4 py-3 text-xs font-bold text-gray-500 uppercase tracking-wider whitespace-nowrap">{h}</th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-50">
-                  {company.visitHistory.sort((a, b) => b.year - a.year).map((v, i) => (
-                    <tr key={i} className="hover:bg-gray-50/50 transition-colors">
-                      <td className="px-4 py-3 text-sm font-bold text-gray-900">{v.year}</td>
-                      <td className="px-4 py-3">
-                        <span className="text-sm font-bold text-emerald-600 bg-emerald-50 px-2 py-1 rounded-md">{v.studentsSelected} students</span>
-                      </td>
-                      <td className="px-4 py-3 text-sm font-medium text-gray-600">{v.ctcOffered ? `${v.ctcOffered} LPA` : "—"}</td>
-                      <td className="px-4 py-3 text-sm text-gray-500 max-w-[200px] truncate" title={v.rolesOffered?.join(", ")}>
-                        {v.rolesOffered?.join(", ") || "—"}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
           </div>
         )}
       </div>

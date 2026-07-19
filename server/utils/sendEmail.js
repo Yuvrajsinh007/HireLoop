@@ -6,6 +6,7 @@ const verificationOtpTemplate    = require("../templates/verificationEmail");
 const loginOtpTemplate           = require("../templates/loginOtpEmail");
 const passwordResetOtpTemplate   = require("../templates/passwordResetEmail");
 const placementAlertTemplate     = require("../templates/placementAlertEmail");
+const staffInviteEmailTemplate   = require("../templates/staffInviteEmail"); // <-- Added
 
 // ─── SMTP Fallback ─────────────────────────────────────────────────────────
 const sendViaSMTP = async (toEmail, name, subject, html) => {
@@ -105,6 +106,15 @@ const sendPlacementAlertEmail = async ({ to, name, companyName, driveDate }) => 
   });
 };
 
+/** Staff Invitation Email */
+const sendStaffInviteEmail = async ({ to, name, role, tempPassword }) => {
+  await sendEmail({
+    to, name,
+    subject: "You've been invited to join HireLoop",
+    html: staffInviteEmailTemplate(name, role, to, tempPassword, `${process.env.CLIENT_URL}/login`),
+  });
+};
+
 module.exports = {
   sendEmail,
   sendWelcomeEmail,
@@ -112,4 +122,5 @@ module.exports = {
   sendLoginOtpEmail,
   sendPasswordResetOtpEmail,
   sendPlacementAlertEmail,
-};  
+  sendStaffInviteEmail,
+};

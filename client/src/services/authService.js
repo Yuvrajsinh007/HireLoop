@@ -5,6 +5,7 @@ export const registerUser   = (data)  => API.post("/auth/register", data);
 export const loginUser      = (data)  => API.post("/auth/login", data);
 export const getMe          = ()      => API.get("/auth/me");
 export const changePassword = (data)  => API.put("/auth/change-password", data);
+// data: { currentPassword, newPassword }
 
 // ─── OTP Login ────────────────────────────────────────────────────────────
 export const sendLoginOtp   = (email) => API.post("/auth/send-login-otp", { email });
