@@ -1,9 +1,8 @@
 import { useState } from "react";
-import { Outlet } from "react-router-dom";
 import Navbar from "./Navbar";
 import Sidebar from "./Sidebar";
 
-const DashboardLayout = () => {
+const DashboardLayout = ({ children }) => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
   return (
@@ -15,7 +14,7 @@ const DashboardLayout = () => {
       />
       <main className="lg:ml-64 pt-16 min-h-screen">
         <div className="page-enter">
-          <Outlet />
+          {children}
         </div>
       </main>
     </div>

@@ -51,7 +51,7 @@ const Navbar = () => {
     if (isCollegeAdmin) {
       return [
         { name: 'Dashboard', path: '/college-admin/dashboard' },
-        { name: 'Structure', path: '/college-admin/structure' },
+        { name: 'Structure', path: '/college-admin/academic-structure' },
         { name: 'Staff', path: '/college-admin/staff' },
       ];
     }
@@ -65,8 +65,8 @@ const Navbar = () => {
     }
     if (isCurrentStudent) {
       return [
-        { name: 'Dashboard', path: '/student/dashboard' },
-        { name: 'Journey', path: '/student/journey' },
+        { name: 'Dashboard', path: '/dashboard' },
+        { name: 'Journey', path: '/journey' },
         { name: 'Drives', path: '/drives' },
         { name: 'Experiences', path: '/experiences' },
       ];

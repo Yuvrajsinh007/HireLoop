@@ -7,7 +7,6 @@ import { SocketProvider } from './context/SocketContext';
 import { NotificationProvider } from './context/NotificationContext';
 
 // Common Components
-import Navbar from './components/common/Navbar';
 import Footer from './components/common/Footer';
 import Toast from './components/common/Toast';
 import ProtectedRoute from './components/common/ProtectedRoute';
@@ -74,7 +73,6 @@ const App = () => {
       <SocketProvider>
         <NotificationProvider>
             <div className="flex flex-col min-h-screen">
-              <Navbar />
 
               <main className="flex-grow">
                 <Routes>

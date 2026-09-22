@@ -7,7 +7,7 @@ import Loader from "../../components/common/Loader";
 import toast from "react-hot-toast";
 import { 
   Building2, Globe, GraduationCap, BookOpen, 
-  Settings, Users, ShieldCheck, AlertCircle, ArrowRight
+  Settings, Users, ShieldCheck, AlertCircle, ArrowRight, CheckCircle2
 } from "lucide-react";
 import api from "../../services/api"; // Adjust depending on your service structure
 
@@ -166,7 +166,7 @@ const CollegeAdminDashboard = () => {
             </div>
             <div className="divide-y divide-gray-50">
               
-              <Link to="/college-admin/structure" className="flex items-center justify-between p-6 hover:bg-indigo-50/30 transition-colors group">
+              <Link to="/college-admin/academic-structure" className="flex items-center justify-between p-6 hover:bg-indigo-50/30 transition-colors group">
                 <div className="flex items-center gap-4">
                   <div className="w-12 h-12 bg-indigo-50 rounded-xl flex items-center justify-center text-indigo-600 group-hover:bg-indigo-600 group-hover:text-white transition-colors">
                     <GraduationCap className="w-6 h-6" />

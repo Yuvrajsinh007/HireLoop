@@ -4,8 +4,7 @@ const Notification = require("../models/Notification");
 const { successResponse, errorResponse } = require("../utils/apiResponse");
 const { tenantFilter } = require("../middleware/tenantMiddleware");
 
-// ─── GET MY APPLICATIONS ──────────────────────────────────────────────────
-// GET /api/applications/my
+
 const getMyApplications = async (req, res) => {
   try {
     const { stage, limit = 50, page = 1 } = req.query;
