@@ -22,7 +22,6 @@ const ProtectedRoute = ({
   allowedRoles,
   allowedAcademic,
   staffOnly = false,
-  alumniOnly = false,
   studentOnly = false,
 }) => {
   const {
@@ -55,18 +54,6 @@ const ProtectedRoute = ({
   if (
     staffOnly &&
     !STAFF_ROLES.includes(user?.role)
-  ) {
-    return (
-      <Navigate
-        to="/unauthorized"
-        replace
-      />
-    );
-  }
-
-  if (
-    alumniOnly &&
-    user?.academicStatus !== "GRADUATED"
   ) {
     return (
       <Navigate

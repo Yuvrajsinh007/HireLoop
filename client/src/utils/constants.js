@@ -17,7 +17,6 @@ export const ACADEMIC_STATUS = {
 export const ACADEMIC_STATUS_LABELS = {
   ENROLLED:       "Current Student",
   FINAL_YEAR:     "Final Year Student",
-  GRADUATED:      "Alumni",
   NOT_APPLICABLE: "Staff",
 };
 
@@ -96,39 +95,6 @@ export const DRIVE_TYPES = [
   { value: "VIRTUAL",     label: "Virtual"      },
 ];
 
-// ─── Guidance Request Status ───────────────────────────────────────────────
-export const GUIDANCE_STATUS = {
-  PENDING_REVIEW:    { label: "Pending Review",     color: "badge-yellow" },
-  ALUMNI_CONTACTED:  { label: "Alumni Contacted",   color: "badge-indigo" },
-  ALUMNI_ACCEPTED:   { label: "Alumni Accepted",    color: "badge-green"  },
-  ALUMNI_DECLINED:   { label: "Alumni Declined",    color: "badge-red"    },
-  SESSION_SCHEDULED: { label: "Session Scheduled",  color: "badge-green"  },
-  COMPLETED:         { label: "Completed",           color: "badge-gray"   },
-  CLOSED:            { label: "Closed",              color: "badge-gray"   },
-};
-
-export const GUIDANCE_TOPICS = [
-  "Interview Preparation",
-  "Resume Review",
-  "DSA Help",
-  "Career Guidance",
-  "Company Specific Prep",
-  "Mock Interview",
-  "General Advice",
-  "Other",
-];
-
-export const MENTORSHIP_SESSION_TYPES = [
-  "Mock Interview",
-  "Resume Review",
-  "Company Prep",
-  "DSA Session",
-  "Career Guidance",
-  "Group Webinar",
-  "Q&A Session",
-  "Other",
-];
-
 // ─── Company Industry ──────────────────────────────────────────────────────
 export const COMPANY_INDUSTRIES = [
   "Product",
@@ -181,7 +147,6 @@ export const NOTIFICATION_TYPES = {
   new_drive:               { label: "New Drive",              icon: "🏢" },
   application_update:      { label: "Application Update",     icon: "📋" },
   new_experience:          { label: "New Experience",         icon: "📝" },
-  guidance_request_update: { label: "Guidance Update",        icon: "🤝" },
   session_scheduled:       { label: "Session Scheduled",      icon: "📅" },
   session_cancelled:       { label: "Session Cancelled",      icon: "❌" },
   session_reminder:        { label: "Session Reminder",       icon: "⏰" },

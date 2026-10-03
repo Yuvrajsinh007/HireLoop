@@ -240,11 +240,8 @@ const Sidebar = ({ isOpen, onClose }) => {
                                     : "text-slate-500 group-hover:bg-white group-hover:text-slate-800"
                                 }`}
                               >
-                                {typeof Icon === "function" ? (
-                                  <Icon className="h-4.5 w-4.5" strokeWidth={2} />
-                                ) : (
-                                  Icon
-                                )}
+                                {/* Direct instantiation of the Icon component */}
+                                <Icon className="h-4.5 w-4.5" strokeWidth={2} />
                               </span>
 
                               {!isCollapsed && (

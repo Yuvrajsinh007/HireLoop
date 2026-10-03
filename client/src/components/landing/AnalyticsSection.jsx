@@ -21,7 +21,6 @@ const CheckIcon = () => (
     const stats = [
       ["Active drives", "12"],
       ["Applications", "428"],
-      ["Mentor matches", "36"],
     ];
   
     return (
@@ -37,7 +36,7 @@ const CheckIcon = () => (
             </h2>
   
             <p className="mt-5 max-w-xl text-base leading-7 text-slate-300">
-              HireLoop keeps students prepared, alumni connected, and placement
+              HireLoop keeps students prepared, connected, and placement
               teams informed—without blending data across institutions.
             </p>
   

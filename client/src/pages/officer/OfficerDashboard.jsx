@@ -112,13 +112,6 @@ const OfficerDashboard = () => {
             color="indigo" 
             subtitle={`Out of ${data?.totalDrives ?? 0} total drives`}
           />
-          <StatsCard 
-            title="Pending Guidance"  
-            value={data?.pendingGuidance ?? 0} 
-            icon={<HelpCircle className="w-5 h-5 text-amber-600" />} 
-            color="amber" 
-            subtitle="Requires your approval"
-          />
         </motion.div>
 
         {/* Charts Row */}

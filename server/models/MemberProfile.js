@@ -52,16 +52,6 @@ const memberProfileSchema = new mongoose.Schema(
       default: "",
     },
 
-    // ─── Current Employment (for alumni) ──────────────────────────────────
-    currentCompany: { type: String, default: "" },
-    currentRole: { type: String, default: "" },
-    currentCTC: { type: Number, default: null }, // in LPA
-
-    // ─── Mentorship ───────────────────────────────────────────────────────
-    // Alumni can opt-in to receive guidance requests via officers
-    isAvailableForMentorship: { type: Boolean, default: false },
-    mentorshipTopics: { type: [String], default: [] },
-
     // ─── Saved Experiences ────────────────────────────────────────────────
     savedExperiences: [
       {

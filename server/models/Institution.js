@@ -153,16 +153,6 @@ const institutionSchema = new mongoose.Schema(
         type: Boolean,
         default: false,
       },
-
-      allowAlumniSelfRegister: {
-        type: Boolean,
-        default: true,
-      },
-
-      requireAlumniVerification: {
-        type: Boolean,
-        default: true,
-      },
     },
 
     isActive: {

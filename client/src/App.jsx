@@ -30,19 +30,8 @@ import JourneyTracker from './pages/student/JourneyTracker';
 import Profile from './pages/student/Profile';
 import SavedExperiences from './pages/student/SavedExperiences';
 
-// Alumni Pages
-import AlumniDashboard from './pages/alumni/AlumniDashboard';
-import AlumniSessions from './pages/alumni/AlumniSessions';
-import MyCareer from './pages/alumni/MyCareer';
-
-// Guidance Pages
-import MyRequests from './pages/guidance/MyRequests';
-import MySessions from './pages/guidance/MySessions';
-import RequestGuidance from './pages/guidance/RequestGuidance';
-
 // Officer Pages
 import OfficerDashboard from './pages/officer/OfficerDashboard';
-import GuidanceInbox from './pages/officer/GuidanceInbox';
 import ManageCompanies from './pages/officer/ManageCompanies';
 import ManageDrives from './pages/officer/ManageDrives';
 import ManageMembers from './pages/officer/ManageMembers';
@@ -106,26 +95,8 @@ const App = () => {
                 </Route>
 
                 <Route element={<ProtectedRoute studentOnly />}>
-                  <Route
-                    path="/guidance/request"
-                    element={<RequestGuidance />}
-                  />
-                  <Route path="/guidance/my" element={<MyRequests />} />
                   <Route path="/dashboard" element={<StudentDashboard />} />
                   <Route path="/journey" element={<JourneyTracker />} />
-                </Route>
-
-                <Route element={<ProtectedRoute alumniOnly />}>
-                  <Route
-                    path="/alumni/dashboard"
-                    element={<AlumniDashboard />}
-                  />
-                  <Route path="/alumni/sessions" element={<AlumniSessions />} />
-                  <Route path="/alumni/career" element={<MyCareer />} />
-                </Route>
-
-                <Route element={<ProtectedRoute staffOnly />}>
-                  <Route path="/guidance/sessions" element={<MySessions />} />
                 </Route>
 
                 <Route
@@ -144,10 +115,6 @@ const App = () => {
                   <Route
                     path="/officer/companies"
                     element={<ManageCompanies />}
-                  />
-                  <Route
-                    path="/officer/guidance"
-                    element={<GuidanceInbox />}
                   />
                   <Route
                     path="/officer/reports"

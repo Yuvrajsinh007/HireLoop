@@ -29,12 +29,6 @@ const INTENTS = [
     Icon: GraduationCap,
     desc: "I am currently enrolled at this institution.",
   },
-  {
-    value: "alumni",
-    label: "Alumni",
-    Icon: Award,
-    desc: "I have graduated from this institution.",
-  },
 ];
 
 const STEPS = ["Verify", "Details", "Role"];

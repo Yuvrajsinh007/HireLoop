@@ -4,7 +4,6 @@ const Application    = require("../models/Application");
 const Company        = require("../models/Company");
 const Experience     = require("../models/Experience");
 const PlacementDrive = require("../models/PlacementDrive");
-const GuidanceRequest= require("../models/GuidanceRequest");
 const { successResponse, errorResponse } = require("../utils/apiResponse");
 const { tenantFilter } = require("../middleware/tenantMiddleware");
 
@@ -18,11 +17,9 @@ const getDashboard = async (req, res) => {
       totalMembers,
       currentStudents,
       placedStudents,
-      alumni,
       totalDrives,
       activeDrives,
       totalExperiences,
-      pendingGuidance,
     ] = await Promise.all([
       User.countDocuments({ ...tFilter, role: "member", isActive: true }),
       User.countDocuments({ ...tFilter, role: "member", academicStatus: { $in: ["ENROLLED","FINAL_YEAR"] } }),
@@ -31,7 +28,6 @@ const getDashboard = async (req, res) => {
       PlacementDrive.countDocuments(tFilter),
       PlacementDrive.countDocuments({ ...tFilter, status: { $in: ["UPCOMING","ACTIVE"] } }),
       Experience.countDocuments({ ...tFilter, isVerified: true }),
-      GuidanceRequest.countDocuments({ ...tFilter, status: "PENDING_REVIEW" }),
     ]);
 
     const placementRate = currentStudents > 0
@@ -122,12 +118,10 @@ const getDashboard = async (req, res) => {
       totalMembers,
       currentStudents,
       placedStudents,
-      alumni,
       placementRate,
       totalDrives,
       activeDrives,
       totalExperiences,
-      pendingGuidance,
       programStats: programStatsFormatted,
       monthlyTrend,
       recentPlacements,
@@ -137,7 +131,7 @@ const getDashboard = async (req, res) => {
   }
 };
 
-// ─── GET ALL MEMBERS (students + alumni) ──────────────────────────────────
+// ─── GET ALL MEMBERS (students) ──────────────────────────────────
 // GET /api/officer/members
 const getMembers = async (req, res) => {
   try {
@@ -245,47 +239,6 @@ const updateMemberStatus = async (req, res) => {
     ).select("-password");
 
     return successResponse(res, 200, "Member status updated", updated);
-  } catch (err) {
-    return errorResponse(res, 500, err.message);
-  }
-};
-
-// ─── GRADUATE BATCH (bulk transition students → alumni) ───────────────────
-// POST /api/officer/graduate-batch
-const graduateBatch = async (req, res) => {
-  try {
-    const { graduationYear, programId } = req.body;
-    if (!graduationYear)
-      return errorResponse(res, 400, "Graduation year is required");
-
-    // Find all profiles matching the batch
-    const profileFilter = { institution: req.institutionId, graduationYear: parseInt(graduationYear) };
-    if (programId) profileFilter.program = programId;
-
-    const profiles  = await MemberProfile.find(profileFilter).select("user");
-    const userIds   = profiles.map((p) => p.user);
-
-    if (userIds.length === 0)
-      return errorResponse(res, 404, "No students found for this graduation year");
-
-    // Update their academicStatus to GRADUATED
-    const result = await User.updateMany(
-      {
-        _id:            { $in: userIds },
-        institution:    req.institutionId,
-        role:           "member",
-        academicStatus: { $in: ["ENROLLED","FINAL_YEAR"] },
-      },
-      {
-        academicStatus:  "GRADUATED",
-        employmentStatus: "SEEKING",
-      }
-    );
-
-    return successResponse(res, 200, `${result.modifiedCount} students graduated successfully`, {
-      graduated: result.modifiedCount,
-      year:      graduationYear,
-    });
   } catch (err) {
     return errorResponse(res, 500, err.message);
   }

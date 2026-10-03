@@ -39,12 +39,12 @@ const buildUserPayload = (user) => ({
 
 // ─── REGISTER ──────────────────────────────────────────────────────────────
 // POST /api/auth/register
-// Members (students/alumni) register with their institutional email
+// Members (students) register with their institutional email
 // The institution is auto-detected from the email domain
 const register = async (req, res) => {
   try {
     const { name, email, password, registrationIntent } = req.body;
-    // registrationIntent: "student" | "alumni"
+    // registrationIntent: "student"
 
     if (!name || !email || !password)
       return errorResponse(res, 400, "Name, email, and password are required");

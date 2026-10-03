@@ -2,7 +2,7 @@ const express = require("express");
 const router  = express.Router();
 const {
   getProfile, updateProfile, uploadAvatar, uploadResume,
-  getDashboardStats, getAlumniStats,
+  getDashboardStats,
   getEmploymentHistory, addEmployment, updateEmployment, deleteEmployment,
   saveExperience, unsaveExperience, getSavedExperiences,
   getNotifications, markNotificationRead, markAllNotificationsRead,
@@ -22,13 +22,6 @@ router.post("/resume",   uploadSingle("resume"), uploadResume);
 
 // ── Dashboard stats ───────────────────────────────────────────────────────
 router.get("/dashboard-stats", getDashboardStats);
-router.get("/alumni-stats",    getAlumniStats);
-
-// ── Employment history (alumni) ───────────────────────────────────────────
-router.get("/employment",         getEmploymentHistory);
-router.post("/employment",        addEmployment);
-router.put("/employment/:id",     updateEmployment);
-router.delete("/employment/:id",  deleteEmployment);
 
 // ── Saved experiences ─────────────────────────────────────────────────────
 router.get("/saved-experiences",        getSavedExperiences);

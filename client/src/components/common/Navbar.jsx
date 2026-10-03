@@ -61,33 +61,14 @@ const Navbar = () => {
             label: "Journey",
             to: "/journey",
           },
-          {
-            label: "Guidance",
-            to: "/guidance/my",
-          },
         ];
 
-      case "alumni":
-        return [
-          {
-            label: "Career",
-            to: "/alumni/career",
-          },
-          {
-            label: "Sessions",
-            to: "/alumni/sessions",
-          },
-        ];
 
       case "officer":
         return [
           {
             label: "Manage drives",
             to: "/officer/drives",
-          },
-          {
-            label: "Guidance",
-            to: "/officer/guidance",
           },
         ];
 

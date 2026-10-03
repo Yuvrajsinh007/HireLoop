@@ -81,8 +81,6 @@ export const AuthProvider = ({ children }) => {
     ? ["ENROLLED","FINAL_YEAR"].includes(user.academicStatus)
     : false;
 
-  const isAlumni = user?.academicStatus === "GRADUATED";
-
   const isStaff = user
     ? ["collegeAdmin","officer","superAdmin"].includes(user.role)
     : false;
@@ -95,7 +93,7 @@ export const AuthProvider = ({ children }) => {
     <AuthContext.Provider value={{
       user, token, isLoading, isAuthenticated,
       login, register, logout, updateUser,
-      isCurrentStudent, isAlumni, isStaff,
+      isCurrentStudent, isStaff,
       isSuperAdmin, isCollegeAdmin, isOfficer,
     }}>
       {children}

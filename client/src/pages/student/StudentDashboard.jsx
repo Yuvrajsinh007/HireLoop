@@ -267,11 +267,6 @@ const StudentDashboard = () => {
                     label: "Read Experiences",
                   },
                   {
-                    to: "/guidance/request",
-                    icon: "🤝",
-                    label: "Request Guidance",
-                  },
-                  {
                     to: "/profile",
                     icon: "👤",
                     label: "Update Profile",

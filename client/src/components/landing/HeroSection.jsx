@@ -75,7 +75,6 @@ const HeroDashboardPreview = () => {
                   ["My applications", false],
                   ["Placement drives", false],
                   ["Experiences", false],
-                  ["Mentorship", false],
                 ].map(([item, active]) => (
                   <div
                     key={item}
@@ -232,8 +231,8 @@ const HeroSection = () => {
           </h1>
 
           <p className="mx-auto mt-7 max-w-2xl text-pretty text-base leading-7 text-slate-600 sm:text-lg sm:leading-8">
-            HireLoop brings applications, placement drives, interview knowledge,
-            and alumni guidance into one verified campus community.
+            HireLoop brings applications, placement drives
+            and interview knowledge into one verified campus community.
           </p>
 
           <div className="mt-9 flex flex-col items-stretch justify-center gap-3 sm:flex-row sm:items-center">

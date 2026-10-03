@@ -495,7 +495,6 @@ const getPlatformStats = async (req, res) => {
       activeInstitutions,
       totalUsers,
       totalStudents,
-      totalAlumni,
       totalOfficers,
     ] = await Promise.all([
       Institution.countDocuments(),
@@ -535,7 +534,6 @@ const getPlatformStats = async (req, res) => {
         activeInstitutions,
         totalUsers,
         totalStudents,
-        totalAlumni,
         totalOfficers,
       }
     );

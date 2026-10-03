@@ -10,7 +10,7 @@ const Footer = () => {
             <Logo />
 
             <p className="mt-4 max-w-xs text-sm leading-6 text-slate-500">
-              Campus placement intelligence for students, alumni, and placement
+              Campus placement intelligence for students and placement
               teams.
             </p>
           </div>

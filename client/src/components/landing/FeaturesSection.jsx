@@ -21,13 +21,6 @@ const FEATURES = [
       accent: "from-amber-400 to-orange-500",
     },
     {
-      icon: "∞",
-      eyebrow: "Get support",
-      title: "Structured alumni mentorship",
-      desc: "Request relevant guidance from alumni through a placement-office mediated and trusted process.",
-      accent: "from-emerald-500 to-teal-500",
-    },
-    {
       icon: "◔",
       eyebrow: "See the signal",
       title: "Placement analytics",

@@ -31,7 +31,6 @@ const updateProfile = async (req, res) => {
     const {
       rollNumber, academicUnit, program, enrollmentYear, graduationYear,
       cgpa, activeBacklogs, skills, linkedIn, github, portfolio, bio,
-      isAvailableForMentorship, mentorshipTopics,
       currentCompany, currentRole, currentCTC,
       alternateEmail,
     } = req.body;
@@ -42,7 +41,6 @@ const updateProfile = async (req, res) => {
       {
         rollNumber, academicUnit, program, enrollmentYear, graduationYear,
         cgpa, activeBacklogs, skills, linkedIn, github, portfolio, bio,
-        isAvailableForMentorship, mentorshipTopics,
         currentCompany, currentRole, currentCTC,
       },
       { new: true, runValidators: true }
@@ -145,124 +143,6 @@ const getDashboardStats = async (req, res) => {
   }
 };
 
-// ─── ALUMNI DASHBOARD STATS ────────────────────────────────────────────────
-// GET /api/members/alumni-stats
-const getAlumniStats = async (req, res) => {
-  try {
-    if (req.user.academicStatus !== "GRADUATED") {
-      return errorResponse(res, 403, "Alumni only endpoint");
-    }
-
-    const profile = await MemberProfile.findOne({ user: req.user._id });
-    const empHistory = await EmploymentHistory.find({ user: req.user._id })
-      .populate("company", "name logo")
-      .sort({ isCurrent: -1, startDate: -1 });
-
-    return successResponse(res, 200, "Alumni stats fetched", {
-      profile,
-      employmentHistory: empHistory,
-      isAvailableForMentorship: profile?.isAvailableForMentorship || false,
-      mentorshipTopics:         profile?.mentorshipTopics || [],
-    });
-  } catch (err) {
-    return errorResponse(res, 500, err.message);
-  }
-};
-
-// ─── EMPLOYMENT HISTORY (alumni) ───────────────────────────────────────────
-// GET /api/members/employment
-const getEmploymentHistory = async (req, res) => {
-  try {
-    const history = await EmploymentHistory.find({ user: req.user._id })
-      .populate("company", "name logo industry")
-      .sort({ isCurrent: -1, startDate: -1 });
-
-    return successResponse(res, 200, "Employment history fetched", history);
-  } catch (err) {
-    return errorResponse(res, 500, err.message);
-  }
-};
-
-// POST /api/members/employment
-const addEmployment = async (req, res) => {
-  try {
-    const {
-      companyName, company, jobTitle, employmentType,
-      ctc, stipend, startDate, endDate, isCurrent,
-      isViaCampus, description,
-    } = req.body;
-
-    if (!companyName) return errorResponse(res, 400, "Company name is required");
-
-    // If marking as current, clear other current entries
-    if (isCurrent) {
-      await EmploymentHistory.updateMany(
-        { user: req.user._id, isCurrent: true },
-        { isCurrent: false }
-      );
-
-      // Update user's current employment info
-      await User.findByIdAndUpdate(req.user._id, {
-        employmentStatus: employmentType === "Intern" ? "INTERN" : "WORKING",
-      });
-
-      await MemberProfile.findOneAndUpdate(
-        { user: req.user._id },
-        { currentCompany: companyName, currentRole: jobTitle, currentCTC: ctc }
-      );
-    }
-
-    const entry = await EmploymentHistory.create({
-      user:           req.user._id,
-      institution:    req.institutionId,
-      companyName,
-      company:        company || null,
-      jobTitle,
-      employmentType,
-      ctc,
-      stipend,
-      startDate,
-      endDate,
-      isCurrent:      isCurrent || false,
-      isViaCampus:    isViaCampus || false,
-      description,
-    });
-
-    return successResponse(res, 201, "Employment added", entry);
-  } catch (err) {
-    return errorResponse(res, 500, err.message);
-  }
-};
-
-// PUT /api/members/employment/:id
-const updateEmployment = async (req, res) => {
-  try {
-    const entry = await EmploymentHistory.findOneAndUpdate(
-      { _id: req.params.id, user: req.user._id },
-      req.body,
-      { new: true, runValidators: true }
-    );
-    if (!entry) return errorResponse(res, 404, "Employment record not found");
-    return successResponse(res, 200, "Employment updated", entry);
-  } catch (err) {
-    return errorResponse(res, 500, err.message);
-  }
-};
-
-// DELETE /api/members/employment/:id
-const deleteEmployment = async (req, res) => {
-  try {
-    const entry = await EmploymentHistory.findOneAndDelete({
-      _id: req.params.id,
-      user: req.user._id,
-    });
-    if (!entry) return errorResponse(res, 404, "Employment record not found");
-    return successResponse(res, 200, "Employment record deleted");
-  } catch (err) {
-    return errorResponse(res, 500, err.message);
-  }
-};
-
 // ─── SAVE / UNSAVE EXPERIENCE ─────────────────────────────────────────────
 // POST /api/members/save-experience/:id
 const saveExperience = async (req, res) => {
@@ -354,7 +234,7 @@ const markAllNotificationsRead = async (req, res) => {
 
 module.exports = {
   getProfile, updateProfile, uploadAvatar, uploadResume,
-  getDashboardStats, getAlumniStats,
+  getDashboardStats,
   getEmploymentHistory, addEmployment, updateEmployment, deleteEmployment,
   saveExperience, unsaveExperience, getSavedExperiences,
   getNotifications, markNotificationRead, markAllNotificationsRead,

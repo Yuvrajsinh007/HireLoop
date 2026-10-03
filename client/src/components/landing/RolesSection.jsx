@@ -13,19 +13,6 @@ const ROLES = [
       ],
     },
     {
-      role: "Alumni",
-      icon: "🏅",
-      color: "bg-emerald-50 border-emerald-100",
-      badge: "text-emerald-700 bg-emerald-100",
-      description:
-        "Give back with meaningful context, experiences, and mentorship opportunities.",
-      benefits: [
-        "Share your hiring journey",
-        "Support juniors at the right time",
-        "Manage your professional timeline",
-      ],
-    },
-    {
       role: "Placement offices",
       icon: "📈",
       color: "bg-amber-50 border-amber-100",
@@ -34,7 +21,6 @@ const ROLES = [
         "Run a more informed placement process without losing the human connection.",
       benefits: [
         "Publish and manage drives",
-        "Coordinate alumni guidance",
         "Monitor placement progress",
       ],
     },

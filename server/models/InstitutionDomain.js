@@ -17,7 +17,7 @@ const institutionDomainSchema = new mongoose.Schema(
     // What type of users this domain is for
     allowedFor: {
       type: [String],
-      enum: ["student", "alumni", "staff"],
+      enum: ["student", "staff"],
       default: ["student"],
     },
     isVerified: { type: Boolean, default: false },

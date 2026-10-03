@@ -44,8 +44,6 @@ export const isEnrolled = (user) =>
 export const isFinalYear = (user) =>
   user?.academicStatus === ACADEMIC_STATUS.FINAL_YEAR;
 
-export const isAlumni = (user) =>
-  user?.academicStatus === ACADEMIC_STATUS.GRADUATED;
 
 export const isCurrentStudent = (user) =>
   [ACADEMIC_STATUS.ENROLLED, ACADEMIC_STATUS.FINAL_YEAR].includes(
@@ -63,19 +61,6 @@ export const canViewReports = (user) => isStaff(user);
 export const canManageInstitution = (user) =>
   isCollegeAdmin(user) || isSuperAdmin(user);
 
-export const canManageGuidance = (user) => isStaff(user);
-
-// Students cannot contact alumni directly. Staff manages guidance mediation.
-export const canContactAlumni = (user) => isStaff(user);
-
-// Only active current students can submit a guidance request.
-export const canRequestGuidance = (user) =>
-  isMember(user) && isCurrentStudent(user);
-
-// Only graduated members can become alumni mentors.
-export const canOfferMentorship = (user) =>
-  isMember(user) && isAlumni(user);
-
 // ─── Dashboard Path ────────────────────────────────────────────────────────
 
 export const getDashboardPath = (user) => {
@@ -86,8 +71,6 @@ export const getDashboardPath = (user) => {
   if (isCollegeAdmin(user)) return "/college-admin/dashboard";
 
   if (isOfficer(user)) return "/officer/dashboard";
-
-  if (isAlumni(user)) return "/alumni/dashboard";
 
   return "/dashboard";
 };
@@ -102,8 +85,6 @@ export const getRoleLabel = (user) => {
   if (isCollegeAdmin(user)) return "College Administrator";
 
   if (isOfficer(user)) return "Placement Officer";
-
-  if (isAlumni(user)) return "Alumni";
 
   if (isFinalYear(user)) return "Final-Year Student";
 
@@ -120,8 +101,6 @@ export const getRoleBadgeColor = (user) => {
   if (isCollegeAdmin(user)) return "badge-violet";
 
   if (isOfficer(user)) return "badge-amber";
-
-  if (isAlumni(user)) return "badge-emerald";
 
   return "badge-slate";
 };
@@ -238,12 +217,6 @@ export const getNavItems = (user) => {
         group: "Placement",
       },
       {
-        path: "/officer/guidance",
-        label: "Guidance Inbox",
-        icon: Handshake,
-        group: "Placement",
-      },
-      {
         path: "/officer/reports",
         label: "Placement Reports",
         icon: LineChart,
@@ -288,12 +261,6 @@ export const getNavItems = (user) => {
         group: "Placement",
       },
       {
-        path: "/officer/guidance",
-        label: "Guidance Inbox",
-        icon: Handshake,
-        group: "Placement",
-      },
-      {
         path: "/officer/reports",
         label: "Placement Reports",
         icon: BarChart3,
@@ -311,31 +278,6 @@ export const getNavItems = (user) => {
   }
 
   // ── Alumni ───────────────────────────────────────────────────────────────
-  if (isAlumni(user)) {
-    return [
-      {
-        path: "/alumni/dashboard",
-        label: "Dashboard",
-        icon: LayoutDashboard,
-        group: "Workspace",
-      },
-      {
-        path: "/alumni/career",
-        label: "My Career",
-        icon: WalletCards,
-        group: "Career",
-      },
-      {
-        path: "/alumni/sessions",
-        label: "Mentorship Sessions",
-        icon: Handshake,
-        group: "Career",
-      },
-      ...exploreItems,
-      savedExperiencesItem,
-      profileItem,
-    ];
-  }
 
   // ── Current Student ──────────────────────────────────────────────────────
   return [
@@ -350,18 +292,6 @@ export const getNavItems = (user) => {
       label: "Journey Tracker",
       icon: CalendarDays,
       group: "Workspace",
-    },
-    {
-      path: "/guidance/request",
-      label: "Request Guidance",
-      icon: Handshake,
-      group: "Career",
-    },
-    {
-      path: "/guidance/my",
-      label: "My Requests",
-      icon: MessageSquareMore,
-      group: "Career",
     },
     ...exploreItems,
     savedExperiencesItem,

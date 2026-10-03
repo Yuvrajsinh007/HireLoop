@@ -20,7 +20,6 @@ const companyRoutes     = require("./routes/companyRoutes");
 const driveRoutes       = require("./routes/driveRoutes");
 const applicationRoutes = require("./routes/applicationRoutes");
 const experienceRoutes  = require("./routes/experienceRoutes");
-const guidanceRoutes    = require("./routes/guidanceRoutes");
 const officerRoutes     = require("./routes/officerRoutes");
 const superAdminRoutes  = require("./routes/superAdminRoutes");
 
@@ -71,7 +70,6 @@ app.use("/api/companies",   companyRoutes);
 app.use("/api/drives",      driveRoutes);
 app.use("/api/applications",applicationRoutes);
 app.use("/api/experiences", experienceRoutes);
-app.use("/api/guidance",    guidanceRoutes);
 app.use("/api/officer",     officerRoutes);
 app.use("/api/super-admin", superAdminRoutes);
 

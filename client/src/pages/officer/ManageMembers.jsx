@@ -95,7 +95,7 @@ const ManageMembers = () => {
               <h1 className="text-2xl md:text-3xl font-bold text-gray-900 tracking-tight">Manage Members</h1>
             </div>
             <p className="text-sm font-medium text-gray-500">
-              Directory of all students and alumni registered within your institution.
+              Directory of all students registered within your institution.
             </p>
           </div>
           

@@ -29,7 +29,7 @@ const userSchema = new mongoose.Schema(
     // superAdmin  = platform owner
     // collegeAdmin = manages one institution
     // officer     = placement operations staff
-    // member      = student OR alumni (differentiated by academicStatus)
+    // member      = student
     role: {
       type: String,
       enum: ["superAdmin", "collegeAdmin", "officer", "member"],
@@ -47,7 +47,6 @@ const userSchema = new mongoose.Schema(
     // ─── Academic Lifecycle Status ────────────────────────────────────────
     // ENROLLED       = current active student
     // FINAL_YEAR     = in final year of study
-    // GRADUATED      = completed degree, now alumni
     // NOT_APPLICABLE = for officers, admins, superAdmins
     academicStatus: {
       type: String,
@@ -82,14 +81,6 @@ const userSchema = new mongoose.Schema(
     isActive: { type: Boolean, default: true },
     lastLogin: { type: Date, default: null },
 
-    // ─── Alternate email for alumni after losing college email ────────────
-    alternateEmail: {
-      type: String,
-      lowercase: true,
-      trim: true,
-      default: "",
-    },
-
     // ─── Email Verification OTP ───────────────────────────────────────────
     emailVerifyOtp:         { type: String,  select: false },
     emailVerifyOtpExpire:   { type: Date,    select: false },
@@ -123,11 +114,6 @@ userSchema.pre("save", async function () {
 userSchema.methods.matchPassword = async function (enteredPassword) {
   return await bcrypt.compare(enteredPassword, this.password);
 };
-
-// ─── isAlumni helper ──────────────────────────────────────────────────────
-userSchema.virtual("isAlumni").get(function () {
-  return this.academicStatus === "GRADUATED";
-});
 
 // ─── isCurrentStudent helper ──────────────────────────────────────────────
 userSchema.virtual("isCurrentStudent").get(function () {

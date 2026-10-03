@@ -42,7 +42,6 @@ const Profile = () => {
   const [form, setForm] = useState({
     rollNumber: "", enrollmentYear: "", graduationYear: "", cgpa: "", activeBacklogs: 0,
     skills: [], linkedIn: "", github: "", portfolio: "", bio: "", alternateEmail: "",
-    isAvailableForMentorship: false, mentorshipTopics: [],
     currentCompany: "", currentRole: "", currentCTC: ""
   });
 
@@ -65,8 +64,6 @@ const Profile = () => {
           portfolio: p.portfolio || "",
           bio: p.bio || "",
           alternateEmail: p.user?.alternateEmail || "",
-          isAvailableForMentorship: p.isAvailableForMentorship || false,
-          mentorshipTopics: p.mentorshipTopics || [],
           currentCompany: p.currentCompany || "",
           currentRole: p.currentRole || "",
           currentCTC: p.currentCTC || "",
@@ -468,73 +465,6 @@ const Profile = () => {
             </div>
           </div>
         </motion.div>
-
-        {/* Alumni / Mentorship Settings (Only shown if graduated or available for mentorship) */}
-        {(isAlumni || editMode || profile?.isAvailableForMentorship) && (
-          <motion.div variants={itemVariants} className="bg-white shadow rounded-lg p-6 mb-8 border border-gray-100">
-            <h3 className="text-lg font-medium text-gray-900 mb-4 border-b border-gray-100 pb-2">Professional & Mentorship Details</h3>
-            
-            {isAlumni && (
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 mb-6 pb-6 border-b border-gray-100">
-                {[
-                  { label: "Current Company", name: "currentCompany" },
-                  { label: "Current Role", name: "currentRole" },
-                  { label: "Current CTC (LPA)", name: "currentCTC", type: "number", step: "0.1" },
-                ].map((f) => (
-                  <div key={f.name}>
-                    <label className="block text-sm font-medium text-gray-700">{f.label}</label>
-                    {editMode ? (
-                      <input type={f.type || "text"} name={f.name} value={form[f.name]} onChange={handleChange} step={f.step}
-                        className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm transition-colors" />
-                    ) : (
-                      <p className="mt-1 text-sm text-gray-900 font-medium">{profile?.[f.name] || "—"}</p>
-                    )}
-                  </div>
-                ))}
-              </div>
-            )}
-
-            <div className="space-y-4">
-              <div className="flex items-start">
-                <div className="flex items-center h-5">
-                  <input type="checkbox" name="isAvailableForMentorship" checked={form.isAvailableForMentorship} onChange={handleChange} disabled={!editMode}
-                    className="focus:ring-indigo-500 h-4 w-4 text-indigo-600 border-gray-300 rounded disabled:opacity-60 cursor-pointer" />
-                </div>
-                <div className="ml-3 text-sm">
-                  <label className="font-medium text-gray-700">Available for Mentorship</label>
-                  <p className="text-gray-500">Allow the placement office to contact you for guiding juniors.</p>
-                </div>
-              </div>
-
-              {(form.isAvailableForMentorship || (!editMode && profile?.mentorshipTopics?.length > 0)) && (
-                <div className="mt-4 pl-7">
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Mentorship Topics</label>
-                  <div className="flex flex-wrap gap-2 mb-3">
-                    {(editMode ? form.mentorshipTopics : profile?.mentorshipTopics || []).map((topic) => (
-                      <span key={topic} className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                        {topic}
-                        {editMode && (
-                          <button onClick={() => removeArrayItem("mentorshipTopics", topic)} className="ml-1.5 inline-flex text-green-600 hover:text-green-800 focus:outline-none">
-                            <X className="w-3 h-3" />
-                          </button>
-                        )}
-                      </span>
-                    ))}
-                  </div>
-                  {editMode && (
-                    <div className="flex gap-2 max-w-sm">
-                      <input type="text" value={topicInput} onChange={(e) => setTopicInput(e.target.value)} onKeyDown={(e) => e.key === "Enter" && addArrayItem("mentorshipTopics", topicInput, setTopicInput)}
-                        className="block w-full border border-gray-300 rounded-md shadow-sm py-1.5 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm" placeholder="e.g., Resume Review" />
-                      <button type="button" onClick={() => addArrayItem("mentorshipTopics", topicInput, setTopicInput)} className="inline-flex items-center px-3 py-1.5 border border-transparent text-xs font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 transition-colors">
-                        Add
-                      </button>
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
-          </motion.div>
-        )}
       </motion.div>
     </DashboardLayout>
   );
