@@ -1,15 +1,14 @@
-import React from 'react';
-import { Routes, Route } from 'react-router-dom';
+import React from "react";
+import { Routes, Route } from "react-router-dom";
 
-// Context Providers
-import { AuthProvider } from './context/AuthContext';
-import { SocketProvider } from './context/SocketContext';
-import { NotificationProvider } from './context/NotificationContext';
+import { AuthProvider } from "./context/AuthContext";
+import { SocketProvider } from "./context/SocketContext";
+import { NotificationProvider } from "./context/NotificationContext";
 
-// Common Components
-import Footer from './components/common/Footer';
-import Toast from './components/common/Toast';
-import ProtectedRoute from './components/common/ProtectedRoute';
+import Navbar from "./components/common/Navbar";
+import Footer from "./components/common/Footer";
+import Toast from "./components/common/Toast";
+import ProtectedRoute from "./components/common/ProtectedRoute";
 
 // Public Pages
 import Landing from './pages/Landing';
@@ -57,6 +56,8 @@ import ManageStaff from './pages/collegeAdmin/ManageStaff';
 // Admin Pages (data verification — officer + collegeAdmin)
 import VerifyData from './pages/admin/VerifyData';
 
+import AppLayout from "./components/layout/AppLayout";
+
 // Super Admin Pages
 import RegisterInstitution from './pages/auth/RegisterInstitution';
 import SuperAdminDashboard from './pages/superAdmin/SuperAdminDashboard';
@@ -72,87 +73,138 @@ const App = () => {
     <AuthProvider>
       <SocketProvider>
         <NotificationProvider>
-            <div className="flex flex-col min-h-screen">
+          <div className="flex min-h-screen flex-col bg-slate-50">
+            <Navbar />
 
-              <main className="flex-grow">
-                <Routes>
-                  {/* ── Public Routes ─────────────────────────────────── */}
-                  <Route path="/" element={<Landing />} />
-                  <Route path="/login" element={<Login />} />
-                  <Route path="/register" element={<Register />} />
-                  <Route path="/register-institution" element={<RegisterInstitution />} />
-                  <Route path="/forgot-password" element={<ForgotPassword />} />
-                  <Route path="/unauthorized" element={<Unauthorized />} />
+            <main className="flex-grow">
+              <Routes>
+                <Route path="/" element={<Landing />} />
+                <Route path="/login" element={<Login />} />
+                <Route path="/register" element={<Register />} />
+                <Route
+                  path="/register-institution"
+                  element={<RegisterInstitution />}
+                />
+                <Route path="/forgot-password" element={<ForgotPassword />} />
+                <Route path="/unauthorized" element={<Unauthorized />} />
 
-                  {/* ── Shared Features (any authenticated user) ─────── */}
-                  <Route element={<ProtectedRoute />}>
-                    <Route path="/companies" element={<CompanyList />} />
-                    <Route path="/companies/:id" element={<CompanyPage />} />
-                    <Route path="/drives" element={<DriveList />} />
-                    <Route path="/drives/:id" element={<DriveDetail />} />
-                    <Route path="/experiences" element={<ExperienceFeed />} />
-                    <Route path="/experiences/:id" element={<ExperienceDetail />} />
-                    <Route path="/profile" element={<Profile />} />
-                    <Route path="/saved-experiences" element={<SavedExperiences />} />
-                  </Route>
+                <Route element={<ProtectedRoute />}>
+                  <Route path="/companies" element={<CompanyList />} />
+                  <Route path="/companies/:id" element={<CompanyPage />} />
+                  <Route path="/drives" element={<DriveList />} />
+                  <Route path="/drives/:id" element={<DriveDetail />} />
+                  <Route path="/experiences" element={<ExperienceFeed />} />
+                  <Route
+                    path="/experiences/:id"
+                    element={<ExperienceDetail />}
+                  />
+                  <Route path="/profile" element={<Profile />} />
+                  <Route
+                    path="/saved-experiences"
+                    element={<SavedExperiences />}
+                  />
+                </Route>
 
-                  {/* ── Guidance (current students only can request) ─── */}
-                  <Route element={<ProtectedRoute studentOnly />}>
-                    <Route path="/guidance/request" element={<RequestGuidance />} />
-                    <Route path="/guidance/my" element={<MyRequests />} />
-                  </Route>
-                  <Route element={<ProtectedRoute alumniOnly />}>
-                    <Route path="/alumni/sessions" element={<AlumniSessions />} />
-                  </Route>
-                  <Route element={<ProtectedRoute staffOnly />}>
-                    <Route path="/guidance/sessions" element={<MySessions />} />
-                  </Route>
+                <Route element={<ProtectedRoute studentOnly />}>
+                  <Route
+                    path="/guidance/request"
+                    element={<RequestGuidance />}
+                  />
+                  <Route path="/guidance/my" element={<MyRequests />} />
+                  <Route path="/dashboard" element={<StudentDashboard />} />
+                  <Route path="/journey" element={<JourneyTracker />} />
+                </Route>
 
-                  {/* ── Student Routes ─────────────────────────────────── */}
-                  <Route element={<ProtectedRoute studentOnly />}>
-                    <Route path="/dashboard" element={<StudentDashboard />} />
-                    <Route path="/journey" element={<JourneyTracker />} />
-                  </Route>
+                <Route element={<ProtectedRoute alumniOnly />}>
+                  <Route
+                    path="/alumni/dashboard"
+                    element={<AlumniDashboard />}
+                  />
+                  <Route path="/alumni/sessions" element={<AlumniSessions />} />
+                  <Route path="/alumni/career" element={<MyCareer />} />
+                </Route>
 
-                  {/* ── Alumni Routes ──────────────────────────────────── */}
-                  <Route element={<ProtectedRoute alumniOnly />}>
-                    <Route path="/alumni/dashboard" element={<AlumniDashboard />} />
-                    <Route path="/alumni/career" element={<MyCareer />} />
-                  </Route>
+                <Route element={<ProtectedRoute staffOnly />}>
+                  <Route path="/guidance/sessions" element={<MySessions />} />
+                </Route>
 
-                  {/* ── Officer Routes ─────────────────────────────────── */}
-                  <Route element={<ProtectedRoute allowedRoles={["officer","collegeAdmin","superAdmin"]} />}>
-                    <Route path="/officer/dashboard" element={<OfficerDashboard />} />
-                    <Route path="/officer/members" element={<ManageMembers />} />
-                    <Route path="/officer/drives" element={<ManageDrives />} />
-                    <Route path="/officer/companies" element={<ManageCompanies />} />
-                    <Route path="/officer/guidance" element={<GuidanceInbox />} />
-                    <Route path="/officer/reports" element={<PlacementReports />} />
-                    <Route path="/officer/verify-data" element={<VerifyData />} />
-                  </Route>
+                <Route
+                  element={
+                    <ProtectedRoute
+                      allowedRoles={["officer", "collegeAdmin", "superAdmin"]}
+                    />
+                  }
+                >
+                  <Route
+                    path="/officer/dashboard"
+                    element={<OfficerDashboard />}
+                  />
+                  <Route path="/officer/members" element={<ManageMembers />} />
+                  <Route path="/officer/drives" element={<ManageDrives />} />
+                  <Route
+                    path="/officer/companies"
+                    element={<ManageCompanies />}
+                  />
+                  <Route
+                    path="/officer/guidance"
+                    element={<GuidanceInbox />}
+                  />
+                  <Route
+                    path="/officer/reports"
+                    element={<PlacementReports />}
+                  />
+                  <Route
+                    path="/officer/verify-data"
+                    element={<VerifyData />}
+                  />
+                </Route>
 
-                  {/* ── College Admin Routes ───────────────────────────── */}
-                  <Route element={<ProtectedRoute allowedRoles={["collegeAdmin","superAdmin"]} />}>
-                    <Route path="/college-admin/dashboard" element={<CollegeAdminDashboard />} />
-                    <Route path="/college-admin/academic-structure" element={<AcademicStructure />} />
-                    <Route path="/college-admin/staff" element={<ManageStaff />} />
-                  </Route>
+                <Route
+                  element={
+                    <ProtectedRoute
+                      allowedRoles={["collegeAdmin", "superAdmin"]}
+                    />
+                  }
+                >
+                  <Route
+                    path="/college-admin/dashboard"
+                    element={<CollegeAdminDashboard />}
+                  />
+                  <Route
+                    path="/college-admin/academic-structure"
+                    element={<AcademicStructure />}
+                  />
+                  <Route
+                    path="/college-admin/staff"
+                    element={<ManageStaff />}
+                  />
+                </Route>
 
-                  {/* ── Super Admin Routes ─────────────────────────────── */}
-                  <Route element={<ProtectedRoute allowedRoles={["superAdmin"]} />}>
-                    <Route path="/super-admin/dashboard" element={<SuperAdminDashboard />} />
-                    <Route path="/super-admin/institutions" element={<ManageInstitutions />} />
-                    <Route path="/super-admin/users" element={<ManageUsers />} />
-                  </Route>
+                <Route
+                  element={<ProtectedRoute allowedRoles={["superAdmin"]} />}
+                >
+                  <Route
+                    path="/super-admin/dashboard"
+                    element={<SuperAdminDashboard />}
+                  />
+                  <Route
+                    path="/super-admin/institutions"
+                    element={<ManageInstitutions />}
+                  />
+                  <Route
+                    path="/super-admin/users"
+                    element={<ManageUsers />}
+                  />
+                </Route>
 
-                  {/* ── 404 ─────────────────────────────────────────────── */}
-                  <Route path="*" element={<NotFound />} />
-                </Routes>
-              </main>
+                <Route path="*" element={<NotFound />} />
+              </Routes>
+            </main>
 
-              <Footer />
-            </div>
-            <Toast />
+            <Footer />
+          </div>
+
+          <Toast />
         </NotificationProvider>
       </SocketProvider>
     </AuthProvider>

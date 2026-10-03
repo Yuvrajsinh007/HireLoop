@@ -1,5 +1,5 @@
 import { useState } from "react";
-import Navbar from "./Navbar";
+// import Navbar from "./Navbar";
 import Sidebar from "./Sidebar";
 
 const DashboardLayout = ({ children }) => {
@@ -7,7 +7,7 @@ const DashboardLayout = ({ children }) => {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <Navbar onMenuClick={() => setSidebarOpen((p) => !p)} />
+      {/* <Navbar onMenuClick={() => setSidebarOpen((p) => !p)} /> */}
       <Sidebar
         isOpen={sidebarOpen}
         onClose={() => setSidebarOpen(false)}

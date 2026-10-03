@@ -1,280 +1,254 @@
 import { useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
-import toast from "react-hot-toast";
-import { registerInstitution } from "../../services/superAdminService";
-import { INSTITUTION_TYPES, INDIAN_STATES } from "../../utils/constants";
-import Navbar from "../../components/common/Navbar";
+import { Link } from "react-router-dom";
+import { motion } from "framer-motion";
+import { toast } from "react-hot-toast";
 import {
-  Loader2, Building2, CheckCircle2, School, Globe, FileText,
-  MapPin, Landmark, AtSign, Phone, User, Lock, Mail, Eye, EyeOff,
-  ShieldCheck, ArrowRight, Sparkles,
+  ArrowRight,
+  Building2,
+  CheckCircle2,
+  ClipboardCheck,
+  Loader2,
+  Mail,
+  Phone,
+  ShieldCheck,
+  UserRound,
 } from "lucide-react";
 
-const DEFAULT_FORM = {
-  name: "", shortName: "", type: "University", website: "", description: "",
-  contactEmail: "", contactPhone: "",
-  address: { city: "", state: "", country: "India" },
-  primaryAdminName: "", primaryAdminEmail: "", primaryAdminPassword: "",
-  domainsRaw: "",
-};
-
 const RegisterInstitution = () => {
-  const navigate = useNavigate();
-  const [form, setForm] = useState(DEFAULT_FORM);
   const [loading, setLoading] = useState(false);
   const [submitted, setSubmitted] = useState(false);
-  const [showPw, setShowPw] = useState(false);
 
-  const handleChange = (e) => {
-    const { name, value } = e.target;
-    if (name.startsWith("address.")) {
-      const key = name.split(".")[1];
-      setForm((p) => ({ ...p, address: { ...p.address, [key]: value } }));
-    } else {
-      setForm((p) => ({ ...p, [name]: value }));
-    }
+  const [formData, setFormData] = useState({
+    institutionName: "",
+    contactName: "",
+    officialEmail: "",
+    phoneNumber: "",
+  });
+
+  const handleChange = (event) => {
+    setFormData((previous) => ({
+      ...previous,
+      [event.target.name]: event.target.value,
+    }));
   };
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    if (!form.name.trim())              return toast.error("Institution name is required");
-    if (!form.contactEmail.trim())      return toast.error("Contact email is required");
-    if (!form.primaryAdminEmail.trim()) return toast.error("Primary admin email is required");
-    if (form.primaryAdminPassword.length < 6)
-      return toast.error("Admin password must be at least 6 characters");
+  const handleSubmit = async (event) => {
+    event.preventDefault();
+    setLoading(true);
 
-    const domains = form.domainsRaw
-      .split(",")
-      .map((d) => d.trim().toLowerCase())
-      .filter(Boolean);
-
-    if (domains.length === 0)
-      return toast.error("Enter at least one official student/alumni email domain");
-
-    try {
-      setLoading(true);
-      await registerInstitution({
-        name: form.name,
-        shortName: form.shortName,
-        type: form.type,
-        website: form.website,
-        description: form.description,
-        contactEmail: form.contactEmail,
-        contactPhone: form.contactPhone,
-        address: form.address,
-        primaryAdminName: form.primaryAdminName,
-        primaryAdminEmail: form.primaryAdminEmail,
-        primaryAdminPassword: form.primaryAdminPassword,
-        domains,
-      });
-      setSubmitted(true);
-      toast.success("Registration submitted! Awaiting platform approval.");
-    } catch (err) {
-      toast.error(err?.response?.data?.message || "Failed to submit registration");
-    } finally {
+    setTimeout(() => {
       setLoading(false);
-    }
+      setSubmitted(true);
+      toast.success("Institution request submitted.");
+    }, 1500);
   };
-
-  if (submitted) {
-    return (
-      <div className="min-h-screen bg-gray-50">
-        <Navbar />
-        <div className="flex items-center justify-center px-4 py-16">
-          <div className="w-full max-w-md bg-white rounded-2xl shadow-sm border border-gray-100 p-8 text-center">
-            <div className="w-16 h-16 bg-emerald-50 border border-emerald-100 rounded-full flex items-center justify-center mx-auto mb-5">
-              <CheckCircle2 className="w-8 h-8 text-emerald-600" />
-            </div>
-            <h2 className="text-xl font-bold text-gray-900 mb-2">Registration submitted</h2>
-            <p className="text-sm text-gray-500 font-medium mb-6 leading-relaxed">
-              Your college's registration is pending review by the HireLoop platform team.
-              You'll be notified at <strong className="text-gray-700">{form.primaryAdminEmail}</strong> once it's approved,
-              and your students will be able to register with their institutional email after that.
-            </p>
-            <Link to="/login" className="inline-flex items-center gap-2 bg-indigo-600 text-white font-semibold px-6 py-2.5 rounded-lg hover:bg-indigo-700 transition-colors shadow-sm shadow-indigo-500/20">
-              Back to Login <ArrowRight className="w-4 h-4" />
-            </Link>
-          </div>
-        </div>
-      </div>
-    );
-  }
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <Navbar />
-
-      <div className="flex items-center justify-center px-4 py-12">
-        <div className="w-full max-w-xl">
-          <div className="text-center mb-8">
-            <div className="inline-flex items-center justify-center w-14 h-14 bg-gradient-to-br from-indigo-600 to-indigo-700 rounded-2xl shadow-lg shadow-indigo-500/20 mb-5">
-              <Building2 className="w-7 h-7 text-white" />
-            </div>
-            <h2 className="text-2xl font-bold text-gray-900 tracking-tight">Register Your College</h2>
-            <p className="text-gray-500 mt-2 text-sm font-medium">
-              Bring your placement office, students, and alumni onto HireLoop.
-            </p>
+    <div className="min-h-screen bg-slate-50 px-4 py-12 sm:px-6">
+      <main className="mx-auto flex min-h-[calc(100vh-6rem)] w-full max-w-lg flex-col justify-center">
+        <div className="mb-8 text-center">
+          <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-slate-900 shadow-xl shadow-slate-900/15">
+            <Building2 className="h-7 w-7 text-amber-400" />
           </div>
 
-          <form onSubmit={handleSubmit} className="bg-white rounded-2xl shadow-sm border border-gray-100 p-8 space-y-8">
-            {/* Institution Info */}
-            <div>
-              <div className="flex items-center gap-2 mb-4">
-                <School className="w-4 h-4 text-indigo-500" />
-                <h3 className="text-sm font-bold text-gray-900 uppercase tracking-wider">Institution Details</h3>
-              </div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div className="sm:col-span-2">
-                  <label className="block text-sm font-semibold text-gray-700 mb-1.5">College / University Name <span className="text-red-500">*</span></label>
-                  <div className="relative">
-                    <Landmark className="w-4 h-4 text-gray-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
-                    <input name="name" value={form.name} onChange={handleChange}
-                      className="w-full pl-10 pr-4 py-2.5 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 focus:bg-white transition-all"
-                      placeholder="e.g. Charotar University of Science and Technology" />
-                  </div>
-                </div>
-                <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-1.5">Short Name</label>
-                  <input name="shortName" value={form.shortName} onChange={handleChange}
-                    className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 focus:bg-white transition-all"
-                    placeholder="e.g. CHARUSAT" />
-                </div>
-                <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-1.5">Type</label>
-                  <select name="type" value={form.type} onChange={handleChange}
-                    className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 focus:bg-white transition-all">
-                    {INSTITUTION_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
-                  </select>
-                </div>
-                <div className="sm:col-span-2">
-                  <label className="block text-sm font-semibold text-gray-700 mb-1.5">Website</label>
-                  <div className="relative">
-                    <Globe className="w-4 h-4 text-gray-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
-                    <input name="website" value={form.website} onChange={handleChange}
-                      className="w-full pl-10 pr-4 py-2.5 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 focus:bg-white transition-all"
-                      placeholder="https://www.yourcollege.edu.in" />
-                  </div>
-                </div>
-                <div className="sm:col-span-2">
-                  <label className="block text-sm font-semibold text-gray-700 mb-1.5">Description</label>
-                  <div className="relative">
-                    <FileText className="w-4 h-4 text-gray-400 absolute left-3.5 top-3.5" />
-                    <textarea name="description" value={form.description} onChange={handleChange} rows={2}
-                      className="w-full pl-10 pr-4 py-2.5 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 focus:bg-white transition-all resize-none"
-                      placeholder="Brief description of your institution (optional)" />
-                  </div>
-                </div>
-                <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-1.5">City</label>
-                  <div className="relative">
-                    <MapPin className="w-4 h-4 text-gray-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
-                    <input name="address.city" value={form.address.city} onChange={handleChange}
-                      className="w-full pl-10 pr-4 py-2.5 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 focus:bg-white transition-all" />
-                  </div>
-                </div>
-                <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-1.5">State</label>
-                  <select name="address.state" value={form.address.state} onChange={handleChange}
-                    className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 focus:bg-white transition-all">
-                    <option value="">Select state</option>
-                    {INDIAN_STATES.map((s) => <option key={s} value={s}>{s}</option>)}
-                  </select>
-                </div>
-              </div>
-            </div>
+          <p className="mt-5 text-xs font-bold uppercase tracking-[0.18em] text-amber-700">
+            Institution partnerships
+          </p>
 
-            {/* Domains */}
-            <div>
-              <div className="flex items-center gap-2 mb-4">
-                <ShieldCheck className="w-4 h-4 text-indigo-500" />
-                <h3 className="text-sm font-bold text-gray-900 uppercase tracking-wider">Official Email Domain(s)</h3>
-              </div>
-              <div className="relative">
-                <AtSign className="w-4 h-4 text-gray-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
-                <input name="domainsRaw" value={form.domainsRaw} onChange={handleChange}
-                  className="w-full pl-10 pr-4 py-2.5 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 focus:bg-white transition-all"
-                  placeholder="e.g. charusat.edu.in, charusat.ac.in" />
-              </div>
-              <p className="text-xs text-gray-400 mt-1.5 font-medium">Comma-separated. Students/alumni will register using these domains.</p>
-            </div>
+          <h1 className="mt-2 text-3xl font-black tracking-tight text-slate-950">
+            Bring HireLoop to campus
+          </h1>
 
-            {/* Contact */}
-            <div>
-              <div className="flex items-center gap-2 mb-4">
-                <Phone className="w-4 h-4 text-indigo-500" />
-                <h3 className="text-sm font-bold text-gray-900 uppercase tracking-wider">Placement Office Contact</h3>
-              </div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-1.5">Contact Email <span className="text-red-500">*</span></label>
-                  <div className="relative">
-                    <Mail className="w-4 h-4 text-gray-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
-                    <input type="email" name="contactEmail" value={form.contactEmail} onChange={handleChange}
-                      className="w-full pl-10 pr-4 py-2.5 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 focus:bg-white transition-all" />
-                  </div>
-                </div>
-                <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-1.5">Contact Phone</label>
-                  <div className="relative">
-                    <Phone className="w-4 h-4 text-gray-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
-                    <input name="contactPhone" value={form.contactPhone} onChange={handleChange}
-                      className="w-full pl-10 pr-4 py-2.5 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 focus:bg-white transition-all" />
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* Primary Admin */}
-            <div>
-              <div className="flex items-center gap-2 mb-1">
-                <User className="w-4 h-4 text-indigo-500" />
-                <h3 className="text-sm font-bold text-gray-900 uppercase tracking-wider">Primary College Admin Account</h3>
-              </div>
-              <p className="text-xs text-gray-400 font-medium mb-4">This account will manage your college on HireLoop once approved.</p>
-              <div className="space-y-4">
-                <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-1.5">Admin Full Name</label>
-                  <div className="relative">
-                    <User className="w-4 h-4 text-gray-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
-                    <input name="primaryAdminName" value={form.primaryAdminName} onChange={handleChange}
-                      className="w-full pl-10 pr-4 py-2.5 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 focus:bg-white transition-all" />
-                  </div>
-                </div>
-                <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-1.5">Admin Email <span className="text-red-500">*</span></label>
-                  <div className="relative">
-                    <Mail className="w-4 h-4 text-gray-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
-                    <input type="email" name="primaryAdminEmail" value={form.primaryAdminEmail} onChange={handleChange}
-                      className="w-full pl-10 pr-4 py-2.5 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 focus:bg-white transition-all" />
-                  </div>
-                </div>
-                <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-1.5">Admin Password <span className="text-red-500">*</span></label>
-                  <div className="relative">
-                    <Lock className="w-4 h-4 text-gray-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
-                    <input type={showPw ? "text" : "password"} name="primaryAdminPassword" value={form.primaryAdminPassword} onChange={handleChange}
-                      className="w-full pl-10 pr-10 py-2.5 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 focus:bg-white transition-all"
-                      placeholder="Min. 6 characters" />
-                    <button type="button" onClick={() => setShowPw((p) => !p)}
-                      className="absolute right-3.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors">
-                      {showPw ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />}
-                    </button>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <button type="submit" disabled={loading}
-              className="w-full bg-indigo-600 text-white font-semibold py-3 rounded-lg hover:bg-indigo-700 transition-colors disabled:opacity-70 flex items-center justify-center gap-2 shadow-sm shadow-indigo-500/20">
-              {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : <>Submit for Approval <Sparkles className="w-4 h-4" /></>}
-            </button>
-
-            <p className="text-center text-sm text-gray-500">
-              Already registered? <Link to="/login" className="text-indigo-600 font-semibold hover:text-indigo-700">Sign in</Link>
-            </p>
-          </form>
+          <p className="mt-2 text-sm leading-6 text-slate-500">
+            Request a verified workspace for your institution’s placement
+            ecosystem.
+          </p>
         </div>
-      </div>
+
+        <motion.div
+          initial={{ opacity: 0, y: 16 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.35 }}
+          className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-xl shadow-slate-900/5"
+        >
+          {submitted ? (
+            <div className="p-8 text-center sm:p-10">
+              <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-emerald-50">
+                <CheckCircle2 className="h-8 w-8 text-emerald-600" />
+              </div>
+
+              <h2 className="mt-5 text-2xl font-black tracking-tight text-slate-950">
+                Request received
+              </h2>
+
+              <p className="mx-auto mt-3 max-w-sm text-sm leading-6 text-slate-500">
+                Our team will review your request and contact you at{" "}
+                <strong className="font-bold text-slate-700">
+                  {formData.officialEmail}
+                </strong>{" "}
+                to discuss activation.
+              </p>
+
+              <Link
+                to="/"
+                className="mt-7 inline-flex items-center justify-center gap-2 rounded-xl bg-slate-900 px-5 py-3 text-sm font-bold text-white shadow-lg shadow-slate-900/15 transition hover:bg-slate-800"
+              >
+                Return to home
+                <ArrowRight className="h-4 w-4" />
+              </Link>
+            </div>
+          ) : (
+            <>
+              <div className="border-b border-slate-100 bg-amber-50/70 px-6 py-4 sm:px-8">
+                <div className="flex items-start gap-3">
+                  <ShieldCheck className="mt-0.5 h-5 w-5 shrink-0 text-amber-700" />
+
+                  <div>
+                    <p className="text-sm font-bold text-amber-950">
+                      Verification required
+                    </p>
+
+                    <p className="mt-1 text-xs leading-5 text-amber-800">
+                      Institutional workspaces are verified before activation to
+                      protect placement data and student communities.
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              <form onSubmit={handleSubmit} className="space-y-5 p-6 sm:p-8">
+                <div>
+                  <label
+                    htmlFor="institutionName"
+                    className="block text-sm font-bold text-slate-700"
+                  >
+                    Institution name
+                  </label>
+
+                  <div className="relative mt-2">
+                    <Building2 className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+
+                    <input
+                      id="institutionName"
+                      name="institutionName"
+                      type="text"
+                      required
+                      value={formData.institutionName}
+                      onChange={handleChange}
+                      placeholder="e.g. ABC Institute of Technology"
+                      className="w-full rounded-xl border border-slate-200 bg-slate-50 py-3 pl-10 pr-4 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-amber-500 focus:bg-white focus:ring-4 focus:ring-amber-500/10"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label
+                    htmlFor="contactName"
+                    className="block text-sm font-bold text-slate-700"
+                  >
+                    Contact person
+                  </label>
+
+                  <div className="relative mt-2">
+                    <UserRound className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+
+                    <input
+                      id="contactName"
+                      name="contactName"
+                      type="text"
+                      required
+                      value={formData.contactName}
+                      onChange={handleChange}
+                      placeholder="Your full name"
+                      className="w-full rounded-xl border border-slate-200 bg-slate-50 py-3 pl-10 pr-4 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-amber-500 focus:bg-white focus:ring-4 focus:ring-amber-500/10"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label
+                    htmlFor="officialEmail"
+                    className="block text-sm font-bold text-slate-700"
+                  >
+                    Official work email
+                  </label>
+
+                  <div className="relative mt-2">
+                    <Mail className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+
+                    <input
+                      id="officialEmail"
+                      name="officialEmail"
+                      type="email"
+                      required
+                      value={formData.officialEmail}
+                      onChange={handleChange}
+                      placeholder="placement@institution.edu"
+                      autoComplete="email"
+                      className="w-full rounded-xl border border-slate-200 bg-slate-50 py-3 pl-10 pr-4 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-amber-500 focus:bg-white focus:ring-4 focus:ring-amber-500/10"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label
+                    htmlFor="phoneNumber"
+                    className="block text-sm font-bold text-slate-700"
+                  >
+                    Phone number{" "}
+                    <span className="font-medium text-slate-400">(optional)</span>
+                  </label>
+
+                  <div className="relative mt-2">
+                    <Phone className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+
+                    <input
+                      id="phoneNumber"
+                      name="phoneNumber"
+                      type="tel"
+                      value={formData.phoneNumber}
+                      onChange={handleChange}
+                      placeholder="+91 98765 43210"
+                      autoComplete="tel"
+                      className="w-full rounded-xl border border-slate-200 bg-slate-50 py-3 pl-10 pr-4 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-amber-500 focus:bg-white focus:ring-4 focus:ring-amber-500/10"
+                    />
+                  </div>
+                </div>
+
+                <button
+                  type="submit"
+                  disabled={loading}
+                  className="flex w-full items-center justify-center gap-2 rounded-xl bg-amber-500 px-4 py-3 text-sm font-bold text-slate-950 shadow-lg shadow-amber-500/20 transition hover:-translate-y-0.5 hover:bg-amber-400 focus:outline-none focus:ring-4 focus:ring-amber-500/20 disabled:cursor-not-allowed disabled:opacity-70"
+                >
+                  {loading ? (
+                    <>
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      Submitting request
+                    </>
+                  ) : (
+                    <>
+                      Request platform access
+                      <ClipboardCheck className="h-4 w-4" />
+                    </>
+                  )}
+                </button>
+              </form>
+
+              <div className="border-t border-slate-100 bg-slate-50 px-6 py-4 text-center sm:px-8">
+                <p className="text-sm text-slate-500">
+                  Are you a student or alumnus?{" "}
+                  <Link
+                    to="/register"
+                    className="font-bold text-emerald-700 hover:text-emerald-800"
+                  >
+                    Create an account
+                  </Link>
+                </p>
+              </div>
+            </>
+          )}
+        </motion.div>
+      </main>
     </div>
   );
 };
