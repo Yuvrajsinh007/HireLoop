@@ -22,6 +22,7 @@ const institutionDomainSchema = new mongoose.Schema(
     },
     isVerified: { type: Boolean, default: false },
     isPrimary:  { type: Boolean, default: false },
+    isActive:   { type: Boolean, default: true },
     addedBy: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "User",

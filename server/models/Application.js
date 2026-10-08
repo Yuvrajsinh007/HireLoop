@@ -1,9 +1,20 @@
 const mongoose = require("mongoose");
 
 const stageLogSchema = new mongoose.Schema({
+  previousStage: { type: String, default: "" },
   stage: { type: String, required: true },
   note:  { type: String, default: "" },
   date:  { type: Date, default: Date.now },
+  updatedBy: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: "User",
+    default: null,
+  },
+  source: {
+    type: String,
+    enum: ["student", "officer", "system"],
+    default: "student",
+  },
 });
 
 const applicationSchema = new mongoose.Schema(
@@ -21,6 +32,11 @@ const applicationSchema = new mongoose.Schema(
       type: mongoose.Schema.Types.ObjectId,
       ref: "User",
       required: true,
+    },
+    drive: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "PlacementDrive",
+      default: null,
     },
     company: {
       type: mongoose.Schema.Types.ObjectId,
@@ -58,6 +74,18 @@ const applicationSchema = new mongoose.Schema(
     ctcOffered: { type: Number, default: null },
     offerLetterUrl: { type: String, default: "" },
     offerLetterPublicId: { type: String, default: "" },
+    offerDate: { type: Date, default: null },
+    joiningDate: { type: Date, default: null },
+    offerVerificationStatus: {
+      type: String,
+      enum: ["NONE", "PENDING", "VERIFIED", "REJECTED"],
+      default: "NONE",
+    },
+    offerVerifiedBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+      default: null,
+    },
     applyDate: { type: Date, default: Date.now },
     notes: {
       type: String,
@@ -69,9 +97,10 @@ const applicationSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
-// One student can apply to a company only once per institution
-applicationSchema.index({ student: 1, company: 1, institution: 1 }, { unique: true });
+applicationSchema.index({ student: 1, drive: 1, institution: 1 }, { unique: true, sparse: true });
+applicationSchema.index({ student: 1, company: 1, institution: 1 });
 applicationSchema.index({ institution: 1, student: 1 });
+applicationSchema.index({ institution: 1, drive: 1 });
 applicationSchema.index({ institution: 1, currentStage: 1 });
 
 const Application = mongoose.model("Application", applicationSchema);

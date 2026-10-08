@@ -6,6 +6,7 @@ const {
   graduateBatch,
   getPlacementReport,
   getStaff, updateUser,
+  exportStudents, exportDriveApplications,
 } = require("../controllers/officerController");
 const { protect }        = require("../middleware/authMiddleware");
 const { injectTenant }   = require("../middleware/tenantMiddleware");
@@ -26,6 +27,10 @@ router.post("/graduate-batch",    authorize("collegeAdmin","superAdmin"), gradua
 
 // ── Reports ───────────────────────────────────────────────────────────────
 router.get("/reports",            authorizeStaff, getPlacementReport);
+
+// ── Exports ───────────────────────────────────────────────────────────────
+router.get("/export/students",    authorizeStaff, exportStudents);
+router.get("/export/drives/:id/applications", authorizeStaff, exportDriveApplications);
 
 // ── Staff management (admin only) ────────────────────────────────────────
 router.get("/staff",              authorize("collegeAdmin","superAdmin"), getStaff);

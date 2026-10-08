@@ -26,6 +26,7 @@ const companySchema = new mongoose.Schema(
         "E-Commerce",
         "Consulting",
         "Core Engineering",
+        "Banking",
         "Banking & Finance",
         "Government / PSU",
         "Startup",

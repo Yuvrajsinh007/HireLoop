@@ -36,14 +36,18 @@ import ManageCompanies from './pages/officer/ManageCompanies';
 import ManageDrives from './pages/officer/ManageDrives';
 import ManageMembers from './pages/officer/ManageMembers';
 import PlacementReports from './pages/officer/PlacementReports';
+import Announcements from './pages/officer/Announcements';
 
 // College Admin Pages
 import CollegeAdminDashboard from './pages/collegeAdmin/CollegeAdminDashboard';
 import AcademicStructure from './pages/collegeAdmin/AcademicStructure';
 import ManageStaff from './pages/collegeAdmin/ManageStaff';
+import EmailDomains from './pages/collegeAdmin/EmailDomains';
 
 // Admin Pages (data verification — officer + collegeAdmin)
 import VerifyData from './pages/admin/VerifyData';
+import AuditLogs from './pages/admin/AuditLogs';
+import Settings from './pages/admin/Settings';
 
 import AppLayout from "./components/layout/AppLayout";
 
@@ -121,6 +125,10 @@ const App = () => {
                     element={<PlacementReports />}
                   />
                   <Route
+                    path="/officer/announcements"
+                    element={<Announcements />}
+                  />
+                  <Route
                     path="/officer/verify-data"
                     element={<VerifyData />}
                   />
@@ -144,6 +152,23 @@ const App = () => {
                   <Route
                     path="/college-admin/staff"
                     element={<ManageStaff />}
+                  />
+                  <Route
+                    path="/college-admin/domains"
+                    element={<EmailDomains />}
+                  />
+                </Route>
+
+                <Route
+                  element={<ProtectedRoute allowedRoles={["superAdmin", "collegeAdmin"]} />}
+                >
+                  <Route
+                    path="/admin/audit-logs"
+                    element={<AuditLogs />}
+                  />
+                  <Route
+                    path="/admin/settings"
+                    element={<Settings />}
                   />
                 </Route>
 

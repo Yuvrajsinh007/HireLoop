@@ -3,7 +3,6 @@ const router  = express.Router();
 const {
   getProfile, updateProfile, uploadAvatar, uploadResume,
   getDashboardStats,
-  getEmploymentHistory, addEmployment, updateEmployment, deleteEmployment,
   saveExperience, unsaveExperience, getSavedExperiences,
   getNotifications, markNotificationRead, markAllNotificationsRead,
 } = require("../controllers/memberController");

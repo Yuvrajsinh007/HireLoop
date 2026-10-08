@@ -22,6 +22,7 @@ const institutionSchema = new mongoose.Schema(
         "Deemed University",
         "Autonomous College",
         "Affiliated College",
+        "Institute",
         "Institute of Technology",
         "Polytechnic",
         "Other",
@@ -126,6 +127,11 @@ const institutionSchema = new mongoose.Schema(
     },
 
     rejectionReason: {
+      type: String,
+      default: "",
+    },
+
+    suspensionReason: {
       type: String,
       default: "",
     },

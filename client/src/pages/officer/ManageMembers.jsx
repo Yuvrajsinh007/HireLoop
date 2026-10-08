@@ -8,7 +8,7 @@ import {
   Users, Search, Filter, Edit2, GraduationCap, 
   X, Loader2, CheckCircle2, ChevronRight
 } from "lucide-react";
-import { getMembers, updateMemberStatus, graduateBatch } from "../../services/officerService"; 
+import { getMembers, updateMemberStatus, graduateBatch, exportStudents } from "../../services/officerService"; 
 import { formatDate } from "../../utils/formatDate";
 
 const ACADEMIC_STATUSES = ["ENROLLED", "FINAL_YEAR", "GRADUATED", "NOT_APPLICABLE"];
@@ -31,6 +31,7 @@ const ManageMembers = () => {
   // Modal States
   const [editingMember, setEditingMember] = useState(null);
   const [showGraduateModal, setShowGraduateModal] = useState(false);
+  const [exporting, setExporting] = useState(false);
 
   // Debounce search
   useEffect(() => {
@@ -59,6 +60,25 @@ const ManageMembers = () => {
       toast.error("Failed to load members");
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleExport = async () => {
+    try {
+      setExporting(true);
+      const res = await exportStudents();
+      const url = window.URL.createObjectURL(new Blob([res.data]));
+      const link = document.createElement("a");
+      link.href = url;
+      link.setAttribute("download", "students.csv");
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      toast.success("Export successful");
+    } catch (err) {
+      toast.error("Failed to export students");
+    } finally {
+      setExporting(false);
     }
   };
 
@@ -99,12 +119,21 @@ const ManageMembers = () => {
             </p>
           </div>
           
-          <button 
-            onClick={() => setShowGraduateModal(true)}
-            className="flex items-center justify-center px-4 py-2.5 bg-indigo-600 text-white text-sm font-bold rounded-lg shadow-sm hover:bg-indigo-700 transition-colors"
-          >
-            <GraduationCap className="w-4 h-4 mr-2" /> Graduate Batch
-          </button>
+          <div className="flex items-center gap-3">
+            <button 
+              onClick={handleExport}
+              disabled={exporting}
+              className="flex items-center justify-center px-4 py-2.5 bg-white border border-gray-300 text-gray-700 text-sm font-bold rounded-lg shadow-sm hover:bg-gray-50 transition-colors disabled:opacity-70"
+            >
+              {exporting ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Filter className="w-4 h-4 mr-2" />} Export CSV
+            </button>
+            <button 
+              onClick={() => setShowGraduateModal(true)}
+              className="flex items-center justify-center px-4 py-2.5 bg-indigo-600 text-white text-sm font-bold rounded-lg shadow-sm hover:bg-indigo-700 transition-colors"
+            >
+              <GraduationCap className="w-4 h-4 mr-2" /> Graduate Batch
+            </button>
+          </div>
         </motion.div>
 
         {/* Toolbar: Search & Filters */}

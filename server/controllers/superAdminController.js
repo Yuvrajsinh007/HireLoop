@@ -21,9 +21,22 @@ const registerInstitution = async (req, res) => {
   try {
     const {
       name,
+      shortName,
+      type,
+      website,
+      description,
       contactName,
       contactEmail,
       contactPhone,
+      address,
+      city,
+      state,
+      pincode,
+      primaryAdminName,
+      primaryAdminEmail,
+      password,
+      emailDomains,
+      logo,
     } = req.body;
 
     // Validation
@@ -52,7 +65,9 @@ const registerInstitution = async (req, res) => {
     }
 
     const normalizedName = name.trim();
-    const normalizedEmail = contactEmail.trim().toLowerCase();
+    const adminEmail = (primaryAdminEmail || contactEmail).trim().toLowerCase();
+    const adminName = (primaryAdminName || contactName).trim();
+    const normalizedEmail = adminEmail;
 
     // Check duplicate institution
     const existingInstitution = await Institution.findOne({
@@ -94,20 +109,68 @@ const registerInstitution = async (req, res) => {
       );
     }
 
-    // Create pending institution
+    if (!password || password.length < 6) {
+      return errorResponse(
+        res,
+        400,
+        "A password of at least 6 characters is required for the primary admin"
+      );
+    }
+
     const institution = await Institution.create({
       name: normalizedName,
-
-      registrationContactName: contactName.trim(),
-
+      shortName: shortName?.trim() || "",
+      type: type || "Autonomous College",
+      website: website?.trim() || "",
+      description: description?.trim() || "",
+      logo: logo || "",
+      registrationContactName: adminName,
       contactEmail: normalizedEmail,
-
       contactPhone: contactPhone?.trim() || "",
-
+      address: {
+        street: address?.trim?.() || address?.street || "",
+        city: city || address?.city || "",
+        state: state || address?.state || "",
+        pincode: pincode || address?.pincode || "",
+      },
       status: "pending",
-
       isActive: true,
     });
+
+    const adminUser = await User.create({
+      name: adminName,
+      email: normalizedEmail,
+      password,
+      role: "collegeAdmin",
+      institution: institution._id,
+      academicStatus: "NOT_APPLICABLE",
+      placementStatus: "NOT_APPLICABLE",
+      employmentStatus: "NOT_APPLICABLE",
+      isActive: false,
+      isEmailVerified: false,
+    });
+
+    institution.primaryAdmin = adminUser._id;
+    await institution.save();
+
+    const domains = Array.isArray(emailDomains)
+      ? emailDomains
+      : typeof emailDomains === "string" && emailDomains.trim()
+        ? emailDomains.split(",").map((d) => d.trim())
+        : [];
+
+    for (const raw of domains) {
+      const domain = raw.toLowerCase().replace(/^@/, "").trim();
+      if (!domain) continue;
+      const taken = await InstitutionDomain.findOne({ domain });
+      if (taken) continue;
+      await InstitutionDomain.create({
+        institution: institution._id,
+        domain,
+        allowedFor: ["student"],
+        isActive: true,
+      });
+    }
 
     return successResponse(
       res,
@@ -188,7 +251,7 @@ const getAllInstitutions = async (req, res) => {
       Institution.find(filter)
         .populate(
           "primaryAdmin",
-          "name email"
+          "name email isActive"
         )
         .sort({ createdAt: -1 })
         .skip(skip)
@@ -197,12 +260,31 @@ const getAllInstitutions = async (req, res) => {
       Institution.countDocuments(filter),
     ]);
 
+    const ids = institutions.map((i) => i._id);
+    const [studentCounts, officerCounts] = await Promise.all([
+      User.aggregate([
+        { $match: { institution: { $in: ids }, role: "member" } },
+        { $group: { _id: "$institution", count: { $sum: 1 } } },
+      ]),
+      User.aggregate([
+        { $match: { institution: { $in: ids }, role: "officer" } },
+        { $group: { _id: "$institution", count: { $sum: 1 } } },
+      ]),
+    ]);
+    const studentMap = Object.fromEntries(studentCounts.map((s) => [s._id.toString(), s.count]));
+    const officerMap = Object.fromEntries(officerCounts.map((s) => [s._id.toString(), s.count]));
+    const institutionsWithCounts = institutions.map((inst) => ({
+      ...inst.toObject(),
+      studentCount: studentMap[inst._id.toString()] || 0,
+      officerCount: officerMap[inst._id.toString()] || 0,
+    }));
+
     return successResponse(
       res,
       200,
       "Institutions fetched",
       {
-        institutions,
+        institutions: institutionsWithCounts,
         total,
         page: parseInt(page),
         totalPages: Math.ceil(
@@ -410,13 +492,66 @@ const createInstitution = async (req, res) => {
 // ─────────────────────────────────────────────────────────────────────────────
 // SUSPEND
 // ─────────────────────────────────────────────────────────────────────────────
+const approveInstitution = async (req, res) => {
+  try {
+    const institution = await Institution.findById(req.params.id);
+    if (!institution) return errorResponse(res, 404, "Institution not found");
+
+    institution.status = "active";
+    institution.approvedBy = req.user._id;
+    institution.approvedAt = new Date();
+    institution.rejectionReason = "";
+    institution.suspensionReason = "";
+    await institution.save();
+
+    if (institution.primaryAdmin) {
+      await User.findByIdAndUpdate(institution.primaryAdmin, {
+        isActive: true,
+        isEmailVerified: true,
+      });
+    }
+
+    return successResponse(res, 200, "Institution approved", institution);
+  } catch (err) {
+    return errorResponse(res, 500, err.message);
+  }
+};
+
+const rejectInstitution = async (req, res) => {
+  try {
+    const { reason } = req.body;
+    if (!reason?.trim()) return errorResponse(res, 400, "Rejection reason is required");
+
+    const institution = await Institution.findById(req.params.id);
+    if (!institution) return errorResponse(res, 404, "Institution not found");
+
+    institution.status = "rejected";
+    institution.rejectionReason = reason.trim();
+    await institution.save();
+
+    if (institution.primaryAdmin) {
+      await User.findByIdAndUpdate(institution.primaryAdmin, { isActive: false });
+    }
+
+    return successResponse(res, 200, "Institution rejected", institution);
+  } catch (err) {
+    return errorResponse(res, 500, err.message);
+  }
+};
+
 const suspendInstitution = async (req, res) => {
   try {
+    const { reason } = req.body;
+    if (!reason?.trim()) {
+      return errorResponse(res, 400, "Suspension reason is required");
+    }
+
     const institution =
       await Institution.findByIdAndUpdate(
         req.params.id,
         {
           status: "suspended",
+          suspensionReason: reason.trim(),
         },
         {
           new: true,
@@ -493,36 +628,21 @@ const getPlatformStats = async (req, res) => {
     const [
       totalInstitutions,
       activeInstitutions,
+      pendingInstitutions,
+      suspendedInstitutions,
       totalUsers,
       totalStudents,
       totalOfficers,
+      totalCollegeAdmins,
     ] = await Promise.all([
       Institution.countDocuments(),
-
-      Institution.countDocuments({
-        status: "active",
-      }),
-
+      Institution.countDocuments({ status: "active" }),
+      Institution.countDocuments({ status: "pending" }),
+      Institution.countDocuments({ status: "suspended" }),
       User.countDocuments(),
-
-      User.countDocuments({
-        role: "member",
-        academicStatus: {
-          $in: [
-            "ENROLLED",
-            "FINAL_YEAR",
-          ],
-        },
-      }),
-
-      User.countDocuments({
-        role: "member",
-        academicStatus: "GRADUATED",
-      }),
-
-      User.countDocuments({
-        role: "officer",
-      }),
+      User.countDocuments({ role: "member" }),
+      User.countDocuments({ role: "officer" }),
+      User.countDocuments({ role: "collegeAdmin" }),
     ]);
 
     return successResponse(
@@ -532,9 +652,12 @@ const getPlatformStats = async (req, res) => {
       {
         totalInstitutions,
         activeInstitutions,
+        pendingInstitutions,
+        suspendedInstitutions,
         totalUsers,
         totalStudents,
         totalOfficers,
+        totalCollegeAdmins,
       }
     );
   } catch (err) {
@@ -634,6 +757,8 @@ module.exports = {
   getAllInstitutions,
   getInstitution,
   createInstitution,
+  approveInstitution,
+  rejectInstitution,
   suspendInstitution,
   reactivateInstitution,
   getPlatformStats,

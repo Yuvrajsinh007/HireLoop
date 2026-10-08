@@ -7,6 +7,8 @@ const {
   getAllInstitutions,
   getInstitution,
   createInstitution,
+  approveInstitution,
+  rejectInstitution,
   suspendInstitution,
   reactivateInstitution,
   getPlatformStats,
@@ -65,6 +67,16 @@ router.get(
 router.post(
   "/institutions",
   createInstitution
+);
+
+router.put(
+  "/institutions/:id/approve",
+  approveInstitution
+);
+
+router.put(
+  "/institutions/:id/reject",
+  rejectInstitution
 );
 
 router.put(

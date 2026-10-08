@@ -85,6 +85,7 @@ const experienceSchema = new mongoose.Schema(
       ref: "User",
       default: null,
     },
+    rejectionReason: { type: String, default: "" },
     isAnonymous: { type: Boolean, default: false },
   },
   { timestamps: true }
@@ -93,6 +94,7 @@ const experienceSchema = new mongoose.Schema(
 experienceSchema.index({ institution: 1, company: 1, year: -1 });
 experienceSchema.index({ institution: 1, outcome: 1 });
 experienceSchema.index({ institution: 1, isVerified: 1 });
+experienceSchema.index({ role: "text", summary: "text", tips: "text" });
 
 const Experience = mongoose.model("Experience", experienceSchema);
 module.exports = Experience;

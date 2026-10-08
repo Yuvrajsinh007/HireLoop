@@ -2,7 +2,6 @@ const User             = require("../models/User");
 const MemberProfile    = require("../models/MemberProfile");
 const Application      = require("../models/Application");
 const Notification     = require("../models/Notification");
-const EmploymentHistory= require("../models/EmploymentHistory");
 const { uploadToCloudinary, deleteFromCloudinary } = require("../config/cloudinary");
 const { successResponse, errorResponse } = require("../utils/apiResponse");
 const { tenantFilter, verifyTenantOwnership } = require("../middleware/tenantMiddleware");
@@ -11,13 +10,24 @@ const { tenantFilter, verifyTenantOwnership } = require("../middleware/tenantMid
 // GET /api/members/profile
 const getProfile = async (req, res) => {
   try {
-    const profile = await MemberProfile.findOne({ user: req.user._id })
+    let profile = await MemberProfile.findOne({ user: req.user._id })
       .populate("user",         "name email avatar role academicStatus placementStatus employmentStatus isEmailVerified alternateEmail")
       .populate("institution",  "name shortName logo")
       .populate("academicUnit", "name code")
       .populate("program",      "name code degreeType durationYears");
 
-    if (!profile) return errorResponse(res, 404, "Profile not found");
+    // If a staff/admin doesn't have a student MemberProfile document, send a fallback structure
+    if (!profile) {
+      profile = {
+        user: req.user,
+        institution: null,
+        academicUnit: null,
+        program: null,
+        skills: [],
+        savedExperiences: [],
+      };
+    }
+
     return successResponse(res, 200, "Profile fetched", profile);
   } catch (err) {
     return errorResponse(res, 500, err.message);
@@ -74,7 +84,7 @@ const uploadAvatar = async (req, res) => {
     }
 
     await User.findByIdAndUpdate(req.user._id, {
-      avatar:          result.secure_url,
+      avatar:         result.secure_url,
       avatarPublicId:  result.public_id,
     });
 
@@ -235,7 +245,6 @@ const markAllNotificationsRead = async (req, res) => {
 module.exports = {
   getProfile, updateProfile, uploadAvatar, uploadResume,
   getDashboardStats,
-  getEmploymentHistory, addEmployment, updateEmployment, deleteEmployment,
   saveExperience, unsaveExperience, getSavedExperiences,
   getNotifications, markNotificationRead, markAllNotificationsRead,
 };

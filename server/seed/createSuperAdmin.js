@@ -1,8 +1,9 @@
+const path = require("path");
 const mongoose = require("mongoose");
 const dotenv = require("dotenv");
 const User = require("../models/User");
 
-dotenv.config();
+dotenv.config({ path: path.join(__dirname, "../.env") });
 
 const run = async () => {
   await mongoose.connect(process.env.MONGO_URI);

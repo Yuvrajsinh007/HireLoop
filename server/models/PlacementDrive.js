@@ -1,21 +1,10 @@
 const mongoose = require("mongoose");
 
 const roundSchema = new mongoose.Schema({
-  name: {
-    type: String,
-    required: true,
-    enum: [
-      "Aptitude Test",
-      "Coding Test",
-      "Group Discussion",
-      "Technical Interview",
-      "HR Interview",
-      "Management Round",
-      "Other",
-    ],
-  },
+  name: { type: String, required: true, trim: true },
   description: { type: String, default: "" },
   duration: { type: String, default: "" },
+  order: { type: Number, default: 0 },
 });
 
 const placementDriveSchema = new mongoose.Schema(
@@ -50,8 +39,8 @@ const placementDriveSchema = new mongoose.Schema(
     applicationDeadline: { type: Date, default: null },
     status: {
       type: String,
-      enum: ["UPCOMING", "ACTIVE", "COMPLETED", "CANCELLED"],
-      default: "UPCOMING",
+      enum: ["DRAFT", "UPCOMING", "ACTIVE", "COMPLETED", "CANCELLED", "ARCHIVED"],
+      default: "DRAFT",
     },
 
     // ─── Eligibility ──────────────────────────────────────────────────────
@@ -61,6 +50,13 @@ const placementDriveSchema = new mongoose.Schema(
         ref: "Program",
       },
     ],
+    eligibleAcademicUnits: [
+      {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "AcademicUnit",
+      },
+    ],
+    eligibleDegreeTypes: { type: [String], default: [] },
     minCGPA: { type: Number, default: 0 },
     maxBacklogs: { type: Number, default: 0 },
     graduationYears: { type: [Number], default: [] },
@@ -92,6 +88,17 @@ const placementDriveSchema = new mongoose.Schema(
     // ─── Documents & Resources ────────────────────────────────────────────
     description: { type: String, default: "" },
     resourceLinks: { type: [String], default: [] },
+    preparationResources: [
+      {
+        title: { type: String, default: "" },
+        url: { type: String, default: "" },
+        type: {
+          type: String,
+          enum: ["LINK", "DRIVE", "PDF", "GUIDE", "OTHER"],
+          default: "LINK",
+        },
+      },
+    ],
 
     // ─── Management ───────────────────────────────────────────────────────
     createdBy: {

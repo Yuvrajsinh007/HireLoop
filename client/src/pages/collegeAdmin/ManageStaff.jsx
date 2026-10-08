@@ -10,6 +10,7 @@ import {
 } from "lucide-react";
 import api from "../../services/api";
 import { getStaff, updateUser } from "../../services/officerService"; 
+import { createOfficer } from "../../services/collegeAdminService";
 
 const ManageStaff = () => {
   const [staff, setStaff] = useState([]);
@@ -200,7 +201,7 @@ const InviteStaffModal = ({ onClose, onSuccess }) => {
     try {
       setLoading(true);
       // Calls the new backend controller endpoint
-      const res = await api.post("/invitations/staff", formData);
+      const res = await createOfficer(formData);
       toast.success("Staff member invited successfully");
       
       // If the backend returns a temporary password, show it to the admin

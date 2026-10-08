@@ -20,3 +20,4 @@ export const forgotPassword  = (email)                   => API.post("/auth/forg
 export const verifyResetOtp  = (email, otp)              => API.post("/auth/verify-reset-otp", { email, otp });
 export const resetPassword   = (email, newPassword, confirmPassword) =>
   API.post("/auth/reset-password", { email, newPassword, confirmPassword });
+  

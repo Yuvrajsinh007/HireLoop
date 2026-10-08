@@ -12,10 +12,10 @@ export const uploadResume       = (fd)     => API.post("/members/resume", fd, {
 
 // ─── Dashboard Stats ───────────────────────────────────────────────────────
 export const getDashboardStats  = ()       => API.get("/members/dashboard-stats");
-export const getAlumniStats     = ()       => API.get("/members/alumni-stats");
 
-// ─── Employment History (alumni) ───────────────────────────────────────────
-export const getEmploymentHistory = ()          => API.get("/members/employment");
+
+
+
 export const addEmployment        = (data)      => API.post("/members/employment", data);
 export const updateEmployment     = (id, data)  => API.put(`/members/employment/${id}`, data);
 export const deleteEmployment     = (id)        => API.delete(`/members/employment/${id}`);

@@ -7,12 +7,14 @@ import {
   Building2,
   CheckCircle2,
   ClipboardCheck,
+  Globe,
   Loader2,
   Mail,
   Phone,
   ShieldCheck,
   UserRound,
 } from "lucide-react";
+import API from "../../services/api" // Ensure you import your API service
 
 const RegisterInstitution = () => {
   const [loading, setLoading] = useState(false);
@@ -20,6 +22,8 @@ const RegisterInstitution = () => {
 
   const [formData, setFormData] = useState({
     institutionName: "",
+    shortName: "",
+    domain: "",
     contactName: "",
     officialEmail: "",
     phoneNumber: "",
@@ -34,13 +38,17 @@ const RegisterInstitution = () => {
 
   const handleSubmit = async (event) => {
     event.preventDefault();
-    setLoading(true);
-
-    setTimeout(() => {
-      setLoading(false);
+    try {
+      setLoading(true);
+      // Connects to your backend institution registration endpoint
+      await API.post("/institutions/register", formData);
       setSubmitted(true);
-      toast.success("Institution request submitted.");
-    }, 1500);
+      toast.success("Institution registration request submitted successfully.");
+    } catch (err) {
+      toast.error(err?.response?.data?.message || "Failed to submit institution request.");
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -60,8 +68,7 @@ const RegisterInstitution = () => {
           </h1>
 
           <p className="mt-2 text-sm leading-6 text-slate-500">
-            Request a verified workspace for your institution’s placement
-            ecosystem.
+            Request a verified workspace and map your institutional email domain.
           </p>
         </div>
 
@@ -82,11 +89,11 @@ const RegisterInstitution = () => {
               </h2>
 
               <p className="mx-auto mt-3 max-w-sm text-sm leading-6 text-slate-500">
-                Our team will review your request and contact you at{" "}
+                Our team will review your domain registration and contact you at{" "}
                 <strong className="font-bold text-slate-700">
                   {formData.officialEmail}
                 </strong>{" "}
-                to discuss activation.
+                upon activation.
               </p>
 
               <Link
@@ -105,29 +112,23 @@ const RegisterInstitution = () => {
 
                   <div>
                     <p className="text-sm font-bold text-amber-950">
-                      Verification required
+                      Domain mapping required
                     </p>
 
                     <p className="mt-1 text-xs leading-5 text-amber-800">
-                      Institutional workspaces are verified before activation to
-                      protect placement data and student communities.
+                      Provide your official web domain (e.g., ctu.edu) so students logging in with that suffix match your portal automatically.
                     </p>
                   </div>
                 </div>
               </div>
 
-              <form onSubmit={handleSubmit} className="space-y-5 p-6 sm:p-8">
+              <form onSubmit={handleSubmit} className="space-y-4 p-6 sm:p-8">
                 <div>
-                  <label
-                    htmlFor="institutionName"
-                    className="block text-sm font-bold text-slate-700"
-                  >
+                  <label htmlFor="institutionName" className="block text-sm font-bold text-slate-700">
                     Institution name
                   </label>
-
                   <div className="relative mt-2">
                     <Building2 className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-
                     <input
                       id="institutionName"
                       name="institutionName"
@@ -135,23 +136,55 @@ const RegisterInstitution = () => {
                       required
                       value={formData.institutionName}
                       onChange={handleChange}
-                      placeholder="e.g. ABC Institute of Technology"
-                      className="w-full rounded-xl border border-slate-200 bg-slate-50 py-3 pl-10 pr-4 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-amber-500 focus:bg-white focus:ring-4 focus:ring-amber-500/10"
+                      placeholder="e.g. California Tech University"
+                      className="w-full rounded-xl border border-slate-200 bg-slate-50 py-3 pl-10 pr-4 text-sm text-slate-900 outline-none transition focus:border-amber-500 focus:bg-white focus:ring-4 focus:ring-amber-500/10"
                     />
                   </div>
                 </div>
 
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <label htmlFor="shortName" className="block text-sm font-bold text-slate-700">
+                      Short Code / Acronym
+                    </label>
+                    <input
+                      id="shortName"
+                      name="shortName"
+                      type="text"
+                      required
+                      value={formData.shortName}
+                      onChange={handleChange}
+                      placeholder="e.g. CTU"
+                      className="w-full mt-2 rounded-xl border border-slate-200 bg-slate-50 py-3 px-4 text-sm text-slate-900 outline-none transition focus:border-amber-500 focus:bg-white focus:ring-4 focus:ring-amber-500/10"
+                    />
+                  </div>
+
+                  <div>
+                    <label htmlFor="domain" className="block text-sm font-bold text-slate-700">
+                      Email Domain Suffix
+                    </label>
+                    <div className="relative mt-2">
+                      <Globe className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                      <input
+                        id="domain"
+                        name="domain"
+                        type="text"
+                        required
+                        value={formData.domain}
+                        onChange={handleChange}
+                        placeholder="ctu.edu"
+                        className="w-full rounded-xl border border-slate-200 bg-slate-50 py-3 pl-10 pr-4 text-sm text-slate-900 outline-none transition focus:border-amber-500 focus:bg-white focus:ring-4 focus:ring-amber-500/10"
+                      />
+                    </div>
+                  </div>
+                </div>
+
                 <div>
-                  <label
-                    htmlFor="contactName"
-                    className="block text-sm font-bold text-slate-700"
-                  >
+                  <label htmlFor="contactName" className="block text-sm font-bold text-slate-700">
                     Contact person
                   </label>
-
                   <div className="relative mt-2">
                     <UserRound className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-
                     <input
                       id="contactName"
                       name="contactName"
@@ -160,22 +193,17 @@ const RegisterInstitution = () => {
                       value={formData.contactName}
                       onChange={handleChange}
                       placeholder="Your full name"
-                      className="w-full rounded-xl border border-slate-200 bg-slate-50 py-3 pl-10 pr-4 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-amber-500 focus:bg-white focus:ring-4 focus:ring-amber-500/10"
+                      className="w-full rounded-xl border border-slate-200 bg-slate-50 py-3 pl-10 pr-4 text-sm text-slate-900 outline-none transition focus:border-amber-500 focus:bg-white focus:ring-4 focus:ring-amber-500/10"
                     />
                   </div>
                 </div>
 
                 <div>
-                  <label
-                    htmlFor="officialEmail"
-                    className="block text-sm font-bold text-slate-700"
-                  >
+                  <label htmlFor="officialEmail" className="block text-sm font-bold text-slate-700">
                     Official work email
                   </label>
-
                   <div className="relative mt-2">
                     <Mail className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-
                     <input
                       id="officialEmail"
                       name="officialEmail"
@@ -183,34 +211,26 @@ const RegisterInstitution = () => {
                       required
                       value={formData.officialEmail}
                       onChange={handleChange}
-                      placeholder="placement@institution.edu"
-                      autoComplete="email"
-                      className="w-full rounded-xl border border-slate-200 bg-slate-50 py-3 pl-10 pr-4 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-amber-500 focus:bg-white focus:ring-4 focus:ring-amber-500/10"
+                      placeholder="admin@ctu.edu"
+                      className="w-full rounded-xl border border-slate-200 bg-slate-50 py-3 pl-10 pr-4 text-sm text-slate-900 outline-none transition focus:border-amber-500 focus:bg-white focus:ring-4 focus:ring-amber-500/10"
                     />
                   </div>
                 </div>
 
                 <div>
-                  <label
-                    htmlFor="phoneNumber"
-                    className="block text-sm font-bold text-slate-700"
-                  >
-                    Phone number{" "}
-                    <span className="font-medium text-slate-400">(optional)</span>
+                  <label htmlFor="phoneNumber" className="block text-sm font-bold text-slate-700">
+                    Phone number <span className="font-medium text-slate-400">(optional)</span>
                   </label>
-
                   <div className="relative mt-2">
                     <Phone className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-
                     <input
                       id="phoneNumber"
                       name="phoneNumber"
                       type="tel"
                       value={formData.phoneNumber}
                       onChange={handleChange}
-                      placeholder="+91 98765 43210"
-                      autoComplete="tel"
-                      className="w-full rounded-xl border border-slate-200 bg-slate-50 py-3 pl-10 pr-4 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-amber-500 focus:bg-white focus:ring-4 focus:ring-amber-500/10"
+                      placeholder="+1 (555) 019-2834"
+                      className="w-full rounded-xl border border-slate-200 bg-slate-50 py-3 pl-10 pr-4 text-sm text-slate-900 outline-none transition focus:border-amber-500 focus:bg-white focus:ring-4 focus:ring-amber-500/10"
                     />
                   </div>
                 </div>
@@ -218,7 +238,7 @@ const RegisterInstitution = () => {
                 <button
                   type="submit"
                   disabled={loading}
-                  className="flex w-full items-center justify-center gap-2 rounded-xl bg-amber-500 px-4 py-3 text-sm font-bold text-slate-950 shadow-lg shadow-amber-500/20 transition hover:-translate-y-0.5 hover:bg-amber-400 focus:outline-none focus:ring-4 focus:ring-amber-500/20 disabled:cursor-not-allowed disabled:opacity-70"
+                  className="flex w-full items-center justify-center gap-2 rounded-xl bg-amber-500 px-4 py-3 text-sm font-bold text-slate-950 shadow-lg shadow-amber-500/20 transition hover:-translate-y-0.5 hover:bg-amber-400 focus:outline-none focus:ring-4 focus:ring-amber-500/20 disabled:cursor-not-allowed disabled:opacity-70 mt-2"
                 >
                   {loading ? (
                     <>
@@ -236,12 +256,9 @@ const RegisterInstitution = () => {
 
               <div className="border-t border-slate-100 bg-slate-50 px-6 py-4 text-center sm:px-8">
                 <p className="text-sm text-slate-500">
-                  Are you a student or alumnus?{" "}
-                  <Link
-                    to="/register"
-                    className="font-bold text-emerald-700 hover:text-emerald-800"
-                  >
-                    Create an account
+                  Already registered?{" "}
+                  <Link to="/register" className="font-bold text-emerald-700 hover:text-emerald-800">
+                    Create a student profile
                   </Link>
                 </p>
               </div>

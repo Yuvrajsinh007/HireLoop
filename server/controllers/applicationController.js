@@ -93,8 +93,8 @@ const updateStage = async (req, res) => {
 
     // Auto-update placement status when placed
     if (["Offer Received","Joined"].includes(stage)) {
-      const { default: User } = await import("../models/User.js").catch(() => ({ default: require("../models/User") }));
-      await require("../models/User").findByIdAndUpdate(req.user._id, {
+      const User = require("../models/User");
+      await User.findByIdAndUpdate(req.user._id, {
         placementStatus: "PLACED",
       });
       await MemberProfile.findOneAndUpdate(
@@ -185,6 +185,86 @@ const getApplication = async (req, res) => {
   }
 };
 
+// ─── UPLOAD OFFER LETTER (Student) ───────────────────────────────────────
+// POST /api/applications/:id/offer
+const uploadOfferLetter = async (req, res) => {
+  try {
+    const { url, publicId } = req.body;
+    if (!url) return errorResponse(res, 400, "File URL is required");
+
+    const application = await Application.findOne({
+      _id: req.params.id,
+      student: req.user._id,
+      institution: req.institutionId,
+    });
+
+    if (!application) return errorResponse(res, 404, "Application not found");
+
+    application.offerLetterUrl = url;
+    if (publicId) application.offerLetterPublicId = publicId;
+    application.offerVerificationStatus = "PENDING";
+    application.offerDate = new Date();
+    await application.save();
+
+    return successResponse(res, 200, "Offer letter uploaded successfully", application);
+  } catch (err) {
+    return errorResponse(res, 500, err.message);
+  }
+};
+
+// ─── VERIFY OFFER (Officer) ────────────────────────────────────────────────
+// PUT /api/applications/:id/verify-offer
+const verifyOffer = async (req, res) => {
+  try {
+    const { status, notes } = req.body;
+    if (!["VERIFIED", "REJECTED"].includes(status)) {
+      return errorResponse(res, 400, "Status must be VERIFIED or REJECTED");
+    }
+
+    const application = await Application.findOne({
+      _id: req.params.id,
+      institution: req.institutionId,
+    }).populate("company", "name");
+
+    if (!application) return errorResponse(res, 404, "Application not found");
+
+    application.offerVerificationStatus = status;
+    application.offerVerifiedBy = req.user._id;
+    if (notes) application.notes = (application.notes ? application.notes + "\n" : "") + "Verification Note: " + notes;
+    await application.save();
+
+    if (status === "VERIFIED") {
+      const User = require("../models/User");
+      await User.findByIdAndUpdate(application.student, {
+        placementStatus: "PLACED",
+      });
+      await MemberProfile.findOneAndUpdate(
+        { user: application.student },
+        { 
+          offerLetterUrl: application.offerLetterUrl,
+          offerCompany: application.company?.name,
+          offerVerificationStatus: "VERIFIED"
+        }
+      );
+    }
+
+    // Notify student
+    await Notification.create({
+      recipient: application.student,
+      institution: req.institutionId,
+      type: "application_update",
+      title: "Offer Letter Update",
+      message: `Your offer letter from ${application.company?.name} was ${status.toLowerCase()}`,
+      link: "/journey",
+      relatedApplication: application._id,
+    });
+
+    return successResponse(res, 200, `Offer ${status.toLowerCase()} successfully`, application);
+  } catch (err) {
+    return errorResponse(res, 500, err.message);
+  }
+};
+
 module.exports = {
   getMyApplications,
   addApplication,
@@ -192,4 +272,6 @@ module.exports = {
   updateApplication,
   deleteApplication,
   getApplication,
+  uploadOfferLetter,
+  verifyOffer
 };

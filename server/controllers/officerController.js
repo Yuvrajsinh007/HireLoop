@@ -1,9 +1,11 @@
+const mongoose       = require("mongoose");
 const User           = require("../models/User");
 const MemberProfile  = require("../models/MemberProfile");
 const Application    = require("../models/Application");
 const Company        = require("../models/Company");
 const Experience     = require("../models/Experience");
 const PlacementDrive = require("../models/PlacementDrive");
+const Program        = require("../models/Program");
 const { successResponse, errorResponse } = require("../utils/apiResponse");
 const { tenantFilter } = require("../middleware/tenantMiddleware");
 
@@ -12,11 +14,14 @@ const { tenantFilter } = require("../middleware/tenantMiddleware");
 const getDashboard = async (req, res) => {
   try {
     const tFilter = { institution: req.institutionId };
+    // aggregate() does not auto-cast to ObjectId, so cast manually
+    const instId = new mongoose.Types.ObjectId(req.institutionId);
 
     const [
       totalMembers,
       currentStudents,
       placedStudents,
+      graduatedStudents,
       totalDrives,
       activeDrives,
       totalExperiences,
@@ -36,7 +41,7 @@ const getDashboard = async (req, res) => {
 
     // Program-wise placement stats
     const programStats = await MemberProfile.aggregate([
-      { $match: { institution: req.institutionId } },
+      { $match: { institution: instId } },
       {
         $lookup: {
           from:         "users",
@@ -67,7 +72,6 @@ const getDashboard = async (req, res) => {
     ]);
 
     // Populate program names
-    const Program = require("../models/Program");
     const programIds = programStats.map((p) => p._id).filter(Boolean);
     const programs   = await Program.find({ _id: { $in: programIds } }).select("name code");
     const programMap = {};
@@ -87,7 +91,7 @@ const getDashboard = async (req, res) => {
     const monthlyTrend = await Application.aggregate([
       {
         $match: {
-          institution:  req.institutionId,
+          institution:  instId,
           currentStage: { $in: ["Offer Received","Joined"] },
           updatedAt:    { $gte: sixMonthsAgo },
         },
@@ -118,6 +122,7 @@ const getDashboard = async (req, res) => {
       totalMembers,
       currentStudents,
       placedStudents,
+      graduatedStudents,
       placementRate,
       totalDrives,
       activeDrives,
@@ -131,7 +136,7 @@ const getDashboard = async (req, res) => {
   }
 };
 
-// ─── GET ALL MEMBERS (students) ──────────────────────────────────
+// ─── GET ALL MEMBERS (students) ───────────────────────────────────────────
 // GET /api/officer/members
 const getMembers = async (req, res) => {
   try {
@@ -141,7 +146,7 @@ const getMembers = async (req, res) => {
       page = 1, limit = 20,
     } = req.query;
 
-    const skip   = (parseInt(page) - 1) * parseInt(limit);
+    const skip = (parseInt(page) - 1) * parseInt(limit);
 
     // Build user filter
     const userFilter = { institution: req.institutionId, role: "member", isActive: true };
@@ -154,13 +159,13 @@ const getMembers = async (req, res) => {
       ];
     }
 
-    const users = await User.find(userFilter).select("_id");
+    const users   = await User.find(userFilter).select("_id");
     const userIds = users.map((u) => u._id);
 
     // Build profile filter
     const profileFilter = { user: { $in: userIds }, institution: req.institutionId };
-    if (program)       profileFilter.program       = program;
-    if (academicUnit)  profileFilter.academicUnit  = academicUnit;
+    if (program)        profileFilter.program        = program;
+    if (academicUnit)   profileFilter.academicUnit   = academicUnit;
     if (graduationYear) profileFilter.graduationYear = parseInt(graduationYear);
 
     const [profiles, total] = await Promise.all([
@@ -175,7 +180,7 @@ const getMembers = async (req, res) => {
     ]);
 
     return successResponse(res, 200, "Members fetched", {
-      members: profiles,
+      members:    profiles,
       total,
       page:       parseInt(page),
       totalPages: Math.ceil(total / parseInt(limit)),
@@ -185,7 +190,7 @@ const getMembers = async (req, res) => {
   }
 };
 
-// ─── GET SINGLE MEMBER (officer can see full profile) ─────────────────────
+// ─── GET SINGLE MEMBER ────────────────────────────────────────────────────
 // GET /api/officer/members/:userId
 const getMember = async (req, res) => {
   try {
@@ -213,13 +218,12 @@ const getMember = async (req, res) => {
   }
 };
 
-// ─── UPDATE MEMBER STATUS (officer can update academic/placement status) ──
+// ─── UPDATE MEMBER STATUS ─────────────────────────────────────────────────
 // PUT /api/officer/members/:userId/status
 const updateMemberStatus = async (req, res) => {
   try {
     const { academicStatus, placementStatus, employmentStatus } = req.body;
 
-    // Verify member belongs to same institution
     const member = await User.findOne({
       _id:         req.params.userId,
       institution: req.institutionId,
@@ -228,8 +232,8 @@ const updateMemberStatus = async (req, res) => {
     if (!member) return errorResponse(res, 404, "Member not found in your institution");
 
     const updates = {};
-    if (academicStatus)  updates.academicStatus  = academicStatus;
-    if (placementStatus) updates.placementStatus = placementStatus;
+    if (academicStatus)   updates.academicStatus   = academicStatus;
+    if (placementStatus)  updates.placementStatus  = placementStatus;
     if (employmentStatus) updates.employmentStatus = employmentStatus;
 
     const updated = await User.findByIdAndUpdate(
@@ -244,6 +248,61 @@ const updateMemberStatus = async (req, res) => {
   }
 };
 
+// ─── GRADUATE BATCH ───────────────────────────────────────────────────────
+// POST /api/officer/graduate-batch
+// Body: { graduationYear, program?, academicUnit?, dryRun? }
+const graduateBatch = async (req, res) => {
+  try {
+    const { graduationYear, program, academicUnit, dryRun = false } = req.body;
+
+    if (!graduationYear)
+      return errorResponse(res, 400, "graduationYear is required");
+
+    const profileFilter = {
+      institution:    req.institutionId,
+      graduationYear: parseInt(graduationYear),
+    };
+    if (program)      profileFilter.program      = program;
+    if (academicUnit) profileFilter.academicUnit = academicUnit;
+
+    const profiles = await MemberProfile.find(profileFilter).select("user");
+    const userIds  = profiles.map((p) => p.user);
+
+    if (userIds.length === 0)
+      return successResponse(res, 200, "No matching students found", {
+        matched:  0,
+        modified: 0,
+      });
+
+    const userFilter = {
+      _id:            { $in: userIds },
+      institution:    req.institutionId,
+      role:           "member",
+      academicStatus: { $ne: "GRADUATED" },
+    };
+
+    if (dryRun) {
+      const count = await User.countDocuments(userFilter);
+      return successResponse(res, 200, "Dry run: students that would be graduated", {
+        matched:  count,
+        modified: 0,
+        dryRun:   true,
+      });
+    }
+
+    const result = await User.updateMany(userFilter, {
+      $set: { academicStatus: "GRADUATED" },
+    });
+
+    return successResponse(res, 200, "Batch graduated successfully", {
+      matched:  result.matchedCount,
+      modified: result.modifiedCount,
+    });
+  } catch (err) {
+    return errorResponse(res, 500, err.message);
+  }
+};
+
 // ─── PLACEMENT REPORT ─────────────────────────────────────────────────────
 // GET /api/officer/reports
 const getPlacementReport = async (req, res) => {
@@ -251,11 +310,13 @@ const getPlacementReport = async (req, res) => {
     const { year } = req.query;
     const filter = tenantFilter(req, {});
 
+    // Always restrict to placed stages (previously only applied when year was set)
+    filter.currentStage = { $in: ["Offer Received","Joined"] };
+
     if (year) {
       const startDate = new Date(`${year}-01-01`);
       const endDate   = new Date(`${parseInt(year) + 1}-01-01`);
-      filter.updatedAt     = { $gte: startDate, $lt: endDate };
-      filter.currentStage  = { $in: ["Offer Received","Joined"] };
+      filter.updatedAt = { $gte: startDate, $lt: endDate };
     }
 
     const placements = await Application.find(filter)
@@ -268,14 +329,14 @@ const getPlacementReport = async (req, res) => {
     const maxCTC = Math.max(0, ...placements.map((p) => p.ctcOffered || 0));
 
     const companyBreakdown = placements.reduce((acc, p) => {
-      const name  = p.company?.name || "Unknown";
-      acc[name]   = (acc[name] || 0) + 1;
+      const name = p.company?.name || "Unknown";
+      acc[name]  = (acc[name] || 0) + 1;
       return acc;
     }, {});
 
     return successResponse(res, 200, "Placement report fetched", {
       totalPlaced,
-      avgCTC:    Math.round(avgCTC * 10) / 10,
+      avgCTC: Math.round(avgCTC * 10) / 10,
       maxCTC,
       companyBreakdown,
       placements,
@@ -285,7 +346,7 @@ const getPlacementReport = async (req, res) => {
   }
 };
 
-// ─── GET ALL STAFF (for admin view) ───────────────────────────────────────
+// ─── GET ALL STAFF ────────────────────────────────────────────────────────
 // GET /api/officer/staff
 const getStaff = async (req, res) => {
   try {
@@ -306,14 +367,12 @@ const updateUser = async (req, res) => {
   try {
     const { role, isActive, academicStatus, placementStatus } = req.body;
 
-    // Ensure user is in same institution
     const target = await User.findOne({
       _id:         req.params.id,
       institution: req.institutionId,
     });
     if (!target) return errorResponse(res, 404, "User not found in your institution");
 
-    // Prevent promoting to superAdmin
     if (role === "superAdmin")
       return errorResponse(res, 403, "Cannot assign superAdmin role");
 
@@ -334,10 +393,70 @@ const updateUser = async (req, res) => {
   }
 };
 
+// ─── EXPORT STUDENTS ────────────────────────────────────────────────────────
+// GET /api/officer/export/students
+const exportStudents = async (req, res) => {
+  try {
+    const userFilter = { institution: req.institutionId, role: "member" };
+    const users = await User.find(userFilter).select("name email academicStatus placementStatus");
+    
+    const userIds = users.map(u => u._id);
+    const profiles = await MemberProfile.find({ user: { $in: userIds } })
+      .populate("program", "name code")
+      .populate("academicUnit", "code");
+      
+    const profileMap = {};
+    profiles.forEach(p => {
+      profileMap[p.user.toString()] = p;
+    });
+
+    let csv = "Name,Email,Academic Status,Placement Status,Program,Academic Unit,CGPA,Active Backlogs\n";
+    users.forEach(u => {
+      const p = profileMap[u._id.toString()] || {};
+      const programCode = p.program ? p.program.code : "";
+      const unitCode = p.academicUnit ? p.academicUnit.code : "";
+      csv += `"${u.name || ""}","${u.email || ""}","${u.academicStatus || ""}","${u.placementStatus || ""}","${programCode}","${unitCode}","${p.cgpa || ""}","${p.activeBacklogs || 0}"\n`;
+    });
+
+    res.header("Content-Type", "text/csv");
+    res.attachment("students.csv");
+    return res.send(csv);
+  } catch (err) {
+    return errorResponse(res, 500, err.message);
+  }
+};
+
+// ─── EXPORT DRIVE APPLICATIONS ─────────────────────────────────────────────
+// GET /api/officer/export/drives/:id/applications
+const exportDriveApplications = async (req, res) => {
+  try {
+    const applications = await Application.find({
+      institution: req.institutionId,
+      drive: req.params.id
+    })
+      .populate("student", "name email academicStatus placementStatus")
+      .populate("company", "name");
+
+    let csv = "Student Name,Email,Academic Status,Placement Status,Company,Stage,Applied Date\n";
+    applications.forEach(a => {
+      const s = a.student || {};
+      const c = a.company || {};
+      csv += `"${s.name || ""}","${s.email || ""}","${s.academicStatus || ""}","${s.placementStatus || ""}","${c.name || ""}","${a.currentStage || ""}","${new Date(a.createdAt).toISOString()}"\n`;
+    });
+
+    res.header("Content-Type", "text/csv");
+    res.attachment("applications.csv");
+    return res.send(csv);
+  } catch (err) {
+    return errorResponse(res, 500, err.message);
+  }
+};
+
 module.exports = {
   getDashboard,
   getMembers, getMember, updateMemberStatus,
   graduateBatch,
   getPlacementReport,
   getStaff, updateUser,
+  exportStudents, exportDriveApplications,
 };

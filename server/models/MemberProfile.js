@@ -29,6 +29,8 @@ const memberProfileSchema = new mongoose.Schema(
     },
 
     // ─── Academic Info ────────────────────────────────────────────────────
+    phone: { type: String, default: "" },
+    dateOfBirth: { type: Date, default: null },
     rollNumber: { type: String, trim: true, default: "" },
     enrollmentYear: { type: Number, default: null },
     graduationYear: { type: Number, default: null },
@@ -37,8 +39,23 @@ const memberProfileSchema = new mongoose.Schema(
 
     // ─── Skills & Resume ──────────────────────────────────────────────────
     skills: { type: [String], default: [] },
+    programmingLanguages: { type: [String], default: [] },
+    technicalSkills: { type: [String], default: [] },
+    softSkills: { type: [String], default: [] },
     resumeUrl: { type: String, default: "" },
     resumePublicId: { type: String, default: "" },
+    offerLetterUrl: { type: String, default: "" },
+    offerLetterPublicId: { type: String, default: "" },
+    offerCompany: { type: String, default: "" },
+    offerRole: { type: String, default: "" },
+    offerCtc: { type: Number, default: null },
+    offerDate: { type: Date, default: null },
+    joiningDate: { type: Date, default: null },
+    offerVerificationStatus: {
+      type: String,
+      enum: ["NONE", "PENDING", "VERIFIED", "REJECTED"],
+      default: "NONE",
+    },
 
     // ─── Social Links ─────────────────────────────────────────────────────
     linkedIn: { type: String, default: "" },

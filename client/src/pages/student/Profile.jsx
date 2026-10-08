@@ -20,7 +20,7 @@ const SKILL_SUGGESTIONS = [
 const COOLDOWN = 60;
 
 const Profile = () => {
-  const { user, updateUser, isAlumni } = useAuth();
+  const { user, updateUser } = useAuth();
   const avatarInputRef = useRef(null);
   const resumeInputRef = useRef(null);
 

@@ -7,16 +7,13 @@ import {
   CalendarDays,
   ClipboardCheck,
   GraduationCap,
-  Handshake,
   LayoutDashboard,
   LineChart,
-  MessageSquareMore,
   Network,
   ShieldCheck,
   UserCog,
   UserRound,
   UsersRound,
-  WalletCards,
 } from "lucide-react";
 
 import { ROLES, ACADEMIC_STATUS } from "./constants";
@@ -106,7 +103,6 @@ export const getRoleBadgeColor = (user) => {
 };
 
 // ─── Sidebar Navigation ────────────────────────────────────────────────────
-// `icon` must be a Lucide React component. Do not use emoji strings here.
 
 const exploreItems = [
   {
@@ -276,8 +272,6 @@ export const getNavItems = (user) => {
       profileItem,
     ];
   }
-
-  // ── Alumni ───────────────────────────────────────────────────────────────
 
   // ── Current Student ──────────────────────────────────────────────────────
   return [

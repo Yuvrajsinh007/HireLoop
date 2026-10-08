@@ -94,6 +94,17 @@ const getEligibleDrives = async (req, res) => {
       });
     }
 
+    // Filter by active backlogs
+    if (profile.activeBacklogs !== undefined && profile.activeBacklogs !== null) {
+      filter.$and = filter.$and || [];
+      filter.$and.push({
+        $or: [
+          { maxBacklogs: { $gte: profile.activeBacklogs } },
+          { maxBacklogs: 0 },
+        ],
+      });
+    }
+
     const drives = await PlacementDrive.find(filter)
       .populate("company",          "name logo industry")
       .populate("eligiblePrograms", "name code")
@@ -238,8 +249,9 @@ const getDriveApplications = async (req, res) => {
     );
     if (!drive) return errorResponse(res, 404, "Drive not found");
 
-    const applications = await Application.find({
+    const applications = await Application.find({ drive: req.params.id,
       institution: req.institutionId,
+      drive: req.params.id,
     })
       .populate("student", "name email avatar academicStatus")
       .sort({ createdAt: -1 });

@@ -30,7 +30,7 @@ const injectTenant = (req, res, next) => {
     return errorResponse(res, 403, "User is not associated with any institution");
   }
 
-  req.institutionId = req.user.institution;
+  req.institutionId = req.user.institution._id || req.user.institution;
   req.isSuperAdmin  = false;
   next();
 };

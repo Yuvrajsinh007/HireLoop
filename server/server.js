@@ -22,6 +22,9 @@ const applicationRoutes = require("./routes/applicationRoutes");
 const experienceRoutes  = require("./routes/experienceRoutes");
 const officerRoutes     = require("./routes/officerRoutes");
 const superAdminRoutes  = require("./routes/superAdminRoutes");
+const collegeAdminRoutes = require("./routes/collegeAdminRoutes");
+const announcementRoutes = require("./routes/announcementRoutes");
+const auditRoutes       = require("./routes/auditRoutes");
 
 // ─── Connect DB ────────────────────────────────────────────────────────────
 connectDB();
@@ -72,6 +75,9 @@ app.use("/api/applications",applicationRoutes);
 app.use("/api/experiences", experienceRoutes);
 app.use("/api/officer",     officerRoutes);
 app.use("/api/super-admin", superAdminRoutes);
+app.use("/api/college-admin", collegeAdminRoutes);
+app.use("/api/announcements", announcementRoutes);
+app.use("/api/audit",       auditRoutes);
 
 // ─── Error Middleware ──────────────────────────────────────────────────────
 app.use(notFound);
@@ -80,7 +86,5 @@ app.use(errorHandler);
 // ─── Start ─────────────────────────────────────────────────────────────────
 const PORT = process.env.PORT || 5000;
 httpServer.listen(PORT, () => {
-  console.log(`\n🚀 HireLoop Server running in ${process.env.NODE_ENV} mode on port ${PORT}`);
-  console.log(`📡 API: http://localhost:${PORT}/api`);
-  console.log(`🔌 Socket.io ready\n`);
+  console.log(`\nHireLoop Server running in ${process.env.NODE_ENV} mode on port ${PORT}`);
 });
