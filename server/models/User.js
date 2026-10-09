@@ -133,7 +133,6 @@ userSchema.virtual("avatarUrl").get(function () {
 // ─── Index for institution-scoped queries ─────────────────────────────────
 userSchema.index({ institution: 1, role: 1 });
 userSchema.index({ institution: 1, academicStatus: 1 });
-userSchema.index({ email: 1 }, { unique: true });
 
 const User = mongoose.model("User", userSchema);
 module.exports = User;
