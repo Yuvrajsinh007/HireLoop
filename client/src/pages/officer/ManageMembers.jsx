@@ -423,7 +423,7 @@ const GraduateBatchModal = ({ onClose, onSuccess }) => {
       return toast.error("Please enter a valid 4-digit year");
     }
 
-    if (!window.confirm(`Are you sure you want to graduate the entire batch of ${graduationYear}? This will convert all matching Enrolled/Final Year students to Alumni status.`)) {
+    if (!window.confirm(`Are you sure you want to graduate the entire batch of ${graduationYear}? This will convert all matching Enrolled/Final Year students to GRADUATED status.`)) {
       return;
     }
 
@@ -458,7 +458,7 @@ const GraduateBatchModal = ({ onClose, onSuccess }) => {
           <div className="bg-blue-50 border border-blue-100 rounded-xl p-4 mb-4 flex gap-3">
             <CheckCircle2 className="w-5 h-5 text-blue-600 flex-shrink-0 mt-0.5" />
             <p className="text-sm text-blue-800 leading-relaxed">
-              This action will permanently convert all <span className="font-bold">Enrolled</span> and <span className="font-bold">Final Year</span> students matching the provided Graduation Year into <span className="font-bold">Alumni</span>.
+              This action will permanently convert all <span className="font-bold">Enrolled</span> and <span className="font-bold">Final Year</span> students matching the provided Graduation Year into <span className="font-bold">GRADUATED status</span>.
             </p>
           </div>
 

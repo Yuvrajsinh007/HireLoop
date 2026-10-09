@@ -13,6 +13,8 @@ const {
   sendStaffInviteEmail,
 } = require("../utils/sendEmail");
 
+const { writeAudit } = require("../utils/audit");
+
 // ─────────────────────────────────────────────────────────────────────────────
 // PUBLIC: REGISTER INSTITUTION
 // POST /api/super-admin/institutions/register
@@ -510,6 +512,13 @@ const approveInstitution = async (req, res) => {
         isEmailVerified: true,
       });
     }
+
+    await writeAudit(req, {
+      action: "APPROVE_INSTITUTION",
+      entity: "Institution",
+      entityId: institution._id,
+      meta: { name: institution.name }
+    });
 
     return successResponse(res, 200, "Institution approved", institution);
   } catch (err) {

@@ -3,6 +3,7 @@ const MemberProfile= require("../models/MemberProfile");
 const Notification = require("../models/Notification");
 const { successResponse, errorResponse } = require("../utils/apiResponse");
 const { tenantFilter } = require("../middleware/tenantMiddleware");
+const { writeAudit } = require("../utils/audit");
 
 
 const getMyApplications = async (req, res) => {
@@ -122,6 +123,12 @@ const updateStage = async (req, res) => {
         message: `${application.company?.name} → ${stage}`,
       });
     }
+    await writeAudit(req, {
+      action: "UPDATE_APPLICATION_STAGE",
+      entity: "Application",
+      entityId: application._id,
+      meta: { stage }
+    });
 
     return successResponse(res, 200, "Stage updated successfully", application);
   } catch (err) {

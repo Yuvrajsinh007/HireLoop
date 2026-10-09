@@ -6,6 +6,8 @@ const User           = require("../models/User");
 const { sendPlacementAlertEmail } = require("../utils/sendEmail");
 const { successResponse, errorResponse } = require("../utils/apiResponse");
 const { tenantFilter, verifyTenantOwnership } = require("../middleware/tenantMiddleware");
+const { writeAudit } = require("../utils/audit");
+
 
 // ─── GET ALL DRIVES (tenant-scoped) ──────────────────────────────────────
 // GET /api/drives
@@ -149,6 +151,14 @@ const createDrive = async (req, res) => {
     });
 
     await drive.populate("company", "name logo");
+    
+    await writeAudit(req, {
+      action: "CREATE_DRIVE",
+      entity: "PlacementDrive",
+      entityId: drive._id,
+      meta: { title: drive.title }
+    });
+
     return successResponse(res, 201, "Drive created successfully", drive);
   } catch (err) {
     return errorResponse(res, 500, err.message);
@@ -166,6 +176,14 @@ const updateDrive = async (req, res) => {
     ).populate("company", "name logo");
 
     if (!drive) return errorResponse(res, 404, "Drive not found");
+
+    await writeAudit(req, {
+      action: "UPDATE_DRIVE",
+      entity: "PlacementDrive",
+      entityId: drive._id,
+      meta: { title: drive.title }
+    });
+
     return successResponse(res, 200, "Drive updated", drive);
   } catch (err) {
     return errorResponse(res, 500, err.message);
@@ -180,6 +198,14 @@ const deleteDrive = async (req, res) => {
       tenantFilter(req, { _id: req.params.id })
     );
     if (!drive) return errorResponse(res, 404, "Drive not found");
+    
+    await writeAudit(req, {
+      action: "DELETE_DRIVE",
+      entity: "PlacementDrive",
+      entityId: drive._id,
+      meta: { title: drive.title }
+    });
+
     return successResponse(res, 200, "Drive deleted");
   } catch (err) {
     return errorResponse(res, 500, err.message);

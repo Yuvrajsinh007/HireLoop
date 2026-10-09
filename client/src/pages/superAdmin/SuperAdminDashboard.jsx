@@ -50,7 +50,6 @@ const SuperAdminDashboard = () => {
   // Format Data for Recharts
   const userDistribution = [
     { name: "Students", value: stats?.totalStudents || 0 },
-    { name: "Alumni", value: stats?.totalAlumni || 0 },
     { name: "Staff & Officers", value: stats?.totalOfficers || 0 },
   ].filter(d => d.value > 0);
 
@@ -123,13 +122,6 @@ const SuperAdminDashboard = () => {
             icon={<Users className="w-5 h-5 text-blue-600" />} 
             color="blue"
             subtitle="Across all roles"
-          />
-          <StatsCard 
-            title="Total Alumni"  
-            value={stats?.totalAlumni || 0} 
-            icon={<GraduationCap className="w-5 h-5 text-emerald-600" />} 
-            color="emerald" 
-            subtitle="Graduated platform members"
           />
         </motion.div>
 

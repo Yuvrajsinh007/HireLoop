@@ -4,6 +4,7 @@ const bcrypt = require("bcryptjs");
 const { successResponse, errorResponse } = require("../utils/apiResponse");
 const crypto = require("crypto");
 const { tenantFilter } = require("../middleware/tenantMiddleware");
+const { writeAudit } = require("../utils/audit");
 
 // ─── OFFICERS ─────────────────────────────────────────────────────────────
 
@@ -35,6 +36,13 @@ const createOfficer = async (req, res) => {
     // Convert to object and remove password
     const officerObj = officer.toObject();
     delete officerObj.password;
+
+    await writeAudit(req, {
+      action: "CREATE_OFFICER",
+      entity: "User",
+      entityId: officer._id,
+      meta: { email }
+    });
 
     return successResponse(res, 201, "Officer created", { officer: officerObj, tempPassword });
   } catch (err) {
@@ -117,6 +125,13 @@ const addDomain = async (req, res) => {
       addedBy: req.user._id
     });
     
+    await writeAudit(req, {
+      action: "ADD_DOMAIN",
+      entity: "InstitutionDomain",
+      entityId: newDomain._id,
+      meta: { domain: cleanDomain }
+    });
+    
     return successResponse(res, 201, "Domain added", newDomain);
   } catch (err) {
     return errorResponse(res, 500, err.message);
@@ -145,6 +160,14 @@ const removeDomain = async (req, res) => {
       { _id: req.params.id, institution: req.institutionId }
     );
     if (!domainObj) return errorResponse(res, 404, "Domain not found");
+    
+    await writeAudit(req, {
+      action: "REMOVE_DOMAIN",
+      entity: "InstitutionDomain",
+      entityId: domainObj._id,
+      meta: { domain: domainObj.domain }
+    });
+
     return successResponse(res, 200, "Domain removed", domainObj);
   } catch (err) {
     return errorResponse(res, 500, err.message);

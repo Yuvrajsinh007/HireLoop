@@ -323,7 +323,7 @@ const Login = () => {
               {[
                 { icon: <GraduationCap className="w-6 h-6" />, title: "Student Portfolios", desc: "Showcase skills, projects, and academics effortlessly." },
                 { icon: <Building2 className="w-6 h-6" />, title: "Drive Management", desc: "Automate shortlisting, interviews, and final offers." },
-                { icon: <Users className="w-6 h-6" />, title: "Alumni Network", desc: "Build connections and share invaluable interview experiences." },
+                { icon: <Users className="w-6 h-6" />, title: "Interview Experiences", desc: "Read and share invaluable interview experiences to help juniors." },
               ].map((feature, idx) => (
                 <div key={idx} className="flex items-start gap-4 p-4 rounded-2xl bg-indigo-800/30 border border-indigo-700/30 backdrop-blur-sm transition-colors hover:bg-indigo-800/40">
                   <div className="flex-shrink-0 p-3 rounded-xl bg-indigo-600/50 text-indigo-100">

@@ -9,8 +9,6 @@ const CampusBanner = () => {
           <div className="flex flex-wrap items-center justify-center gap-x-6 gap-y-2 text-xs font-bold uppercase tracking-[0.14em] text-slate-400 sm:justify-end">
             <span>Students</span>
             <span className="hidden h-1 w-1 rounded-full bg-slate-300 sm:block" />
-            <span>Alumni</span>
-            <span className="hidden h-1 w-1 rounded-full bg-slate-300 sm:block" />
             <span>Placement teams</span>
           </div>
         </div>
