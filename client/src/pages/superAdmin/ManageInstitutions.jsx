@@ -10,7 +10,7 @@ import {
 import api from "../../services/api"; 
 import { formatDate } from "../../utils/formatDate";
 
-const STATUS_OPTIONS = ["active", "suspended"];
+const STATUS_OPTIONS = ["active", "suspended", "pending", "rejected"];
 
 const ManageInstitutions = () => {
   const [institutions, setInstitutions] = useState([]);
@@ -71,6 +71,29 @@ const ManageInstitutions = () => {
       fetchInstitutions();
     } catch (err) {
       toast.error(err?.response?.data?.message || "Failed to reactivate institution");
+    }
+  };
+
+  const handleApprove = async (id, name) => {
+    if (!window.confirm(`Are you sure you want to approve ${name}?`)) return;
+    try {
+      await api.put(`/super-admin/institutions/${id}/approve`);
+      toast.success(`${name} has been approved.`);
+      fetchInstitutions();
+    } catch (err) {
+      toast.error(err?.response?.data?.message || "Failed to approve institution");
+    }
+  };
+
+  const handleReject = async (id, name) => {
+    const reason = window.prompt(`Please provide a reason for rejecting ${name}:`);
+    if (reason === null) return;
+    try {
+      await api.put(`/super-admin/institutions/${id}/reject`, { reason });
+      toast.success(`${name} has been rejected.`);
+      fetchInstitutions();
+    } catch (err) {
+      toast.error(err?.response?.data?.message || "Failed to reject institution");
     }
   };
 
@@ -211,22 +234,44 @@ const ManageInstitutions = () => {
                         <td className="px-6 py-4 whitespace-nowrap">
                           <span className={`inline-flex items-center px-2.5 py-1 rounded-md text-[10px] uppercase tracking-wider font-bold shadow-sm border ${
                             inst.status === 'active' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' :
+                            inst.status === 'pending' ? 'bg-yellow-50 text-yellow-700 border-yellow-200' :
+                            inst.status === 'rejected' ? 'bg-red-50 text-red-700 border-red-200' :
                             'bg-orange-50 text-orange-700 border-orange-200'
                           }`}>
                             {inst.status === 'active' && <CheckCircle2 className="w-3 h-3 mr-1" />}
+                            {inst.status === 'pending' && <Loader2 className="w-3 h-3 mr-1 animate-spin" />}
+                            {inst.status === 'rejected' && <X className="w-3 h-3 mr-1" />}
+                            {inst.status === 'suspended' && <Ban className="w-3 h-3 mr-1" />}
                             {inst.status}
                           </span>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-right">
                           <div className="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                            {inst.status === "active" ? (
+                            {inst.status === "pending" && (
+                              <>
+                                <button 
+                                  onClick={() => handleApprove(inst._id, inst.name)}
+                                  className="px-3 py-1.5 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 hover:text-emerald-800 border border-emerald-200 rounded-lg text-xs font-bold transition-colors shadow-sm flex items-center"
+                                >
+                                  <CheckCircle2 className="w-3.5 h-3.5 mr-1" /> Approve
+                                </button>
+                                <button 
+                                  onClick={() => handleReject(inst._id, inst.name)}
+                                  className="px-3 py-1.5 bg-red-50 text-red-700 hover:bg-red-100 hover:text-red-800 border border-red-200 rounded-lg text-xs font-bold transition-colors shadow-sm flex items-center"
+                                >
+                                  <X className="w-3.5 h-3.5 mr-1" /> Reject
+                                </button>
+                              </>
+                            )}
+                            {inst.status === "active" && (
                               <button 
                                 onClick={() => handleSuspend(inst._id, inst.name)}
                                 className="px-3 py-1.5 bg-orange-50 text-orange-700 hover:bg-orange-100 hover:text-orange-800 border border-orange-200 rounded-lg text-xs font-bold transition-colors shadow-sm flex items-center"
                               >
                                 <Ban className="w-3.5 h-3.5 mr-1" /> Suspend
                               </button>
-                            ) : (
+                            )}
+                            {inst.status === "suspended" && (
                               <button 
                                 onClick={() => handleReactivate(inst._id, inst.name)}
                                 className="px-3 py-1.5 bg-indigo-50 text-indigo-700 hover:bg-indigo-100 hover:text-indigo-800 border border-indigo-200 rounded-lg text-xs font-bold transition-colors shadow-sm flex items-center"

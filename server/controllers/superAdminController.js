@@ -3,6 +3,7 @@ const crypto = require("crypto");
 const Institution = require("../models/Institution");
 const InstitutionDomain = require("../models/InstitutionDomain");
 const User = require("../models/User");
+const InstitutionRequest = require("../models/InstitutionRequest");
 
 const {
   successResponse,
@@ -71,7 +72,7 @@ const registerInstitution = async (req, res) => {
     const adminName = (primaryAdminName || contactName).trim();
     const normalizedEmail = adminEmail;
 
-    // Check duplicate institution
+    // Check duplicate institution in active institutions
     const existingInstitution = await Institution.findOne({
       name: {
         $regex: `^${normalizedName.replace(
@@ -83,18 +84,29 @@ const registerInstitution = async (req, res) => {
     });
 
     if (existingInstitution) {
-      if (existingInstitution.status === "pending") {
-        return errorResponse(
-          res,
-          400,
-          "A registration request for this institution is already pending"
-        );
-      }
-
       return errorResponse(
         res,
         400,
         "An institution with this name already exists"
+      );
+    }
+
+    // Check duplicate in requests
+    const existingRequest = await InstitutionRequest.findOne({
+      name: {
+        $regex: `^${normalizedName.replace(
+          /[.*+?^${}()|[\]\\]/g,
+          "\\$&"
+        )}$`,
+        $options: "i",
+      },
+    });
+
+    if (existingRequest && existingRequest.status === "pending") {
+      return errorResponse(
+        res,
+        400,
+        "A registration request for this institution is already pending"
       );
     }
 
@@ -119,7 +131,13 @@ const registerInstitution = async (req, res) => {
       );
     }
 
-    const institution = await Institution.create({
+    const domains = Array.isArray(emailDomains)
+      ? emailDomains
+      : typeof emailDomains === "string" && emailDomains.trim()
+        ? emailDomains.split(",").map((d) => d.trim().toLowerCase().replace(/^@/, ""))
+        : [];
+
+    const request = await InstitutionRequest.create({
       name: normalizedName,
       shortName: shortName?.trim() || "",
       type: type || "Autonomous College",
@@ -135,44 +153,12 @@ const registerInstitution = async (req, res) => {
         state: state || address?.state || "",
         pincode: pincode || address?.pincode || "",
       },
+      primaryAdminName: adminName,
+      primaryAdminEmail: normalizedEmail,
+      password: password, // Will be hashed upon approval
+      emailDomains: domains,
       status: "pending",
-      isActive: true,
     });
-
-    const adminUser = await User.create({
-      name: adminName,
-      email: normalizedEmail,
-      password,
-      role: "collegeAdmin",
-      institution: institution._id,
-      academicStatus: "NOT_APPLICABLE",
-      placementStatus: "NOT_APPLICABLE",
-      employmentStatus: "NOT_APPLICABLE",
-      isActive: false,
-      isEmailVerified: false,
-    });
-
-    institution.primaryAdmin = adminUser._id;
-    await institution.save();
-
-    const domains = Array.isArray(emailDomains)
-      ? emailDomains
-      : typeof emailDomains === "string" && emailDomains.trim()
-        ? emailDomains.split(",").map((d) => d.trim())
-        : [];
-
-    for (const raw of domains) {
-      const domain = raw.toLowerCase().replace(/^@/, "").trim();
-      if (!domain) continue;
-      const taken = await InstitutionDomain.findOne({ domain });
-      if (taken) continue;
-      await InstitutionDomain.create({
-        institution: institution._id,
-        domain,
-        allowedFor: ["student"],
-        isActive: true,
-      });
-    }
 
     return successResponse(
       res,
@@ -180,10 +166,10 @@ const registerInstitution = async (req, res) => {
       "Institution registration submitted successfully",
       {
         institution: {
-          _id: institution._id,
-          name: institution.name,
-          status: institution.status,
-          contactEmail: institution.contactEmail,
+          _id: request._id,
+          name: request.name,
+          status: request.status,
+          contactEmail: request.contactEmail,
         },
       }
     );
@@ -246,47 +232,93 @@ const getAllInstitutions = async (req, res) => {
       ];
     }
 
-    const [
-      institutions,
-      total,
-    ] = await Promise.all([
-      Institution.find(filter)
-        .populate(
-          "primaryAdmin",
-          "name email isActive"
-        )
-        .sort({ createdAt: -1 })
-        .skip(skip)
-        .limit(parseInt(limit)),
-
-      Institution.countDocuments(filter),
-    ]);
-
-    const ids = institutions.map((i) => i._id);
-    const [studentCounts, officerCounts] = await Promise.all([
-      User.aggregate([
-        { $match: { institution: { $in: ids }, role: "member" } },
-        { $group: { _id: "$institution", count: { $sum: 1 } } },
-      ]),
-      User.aggregate([
-        { $match: { institution: { $in: ids }, role: "officer" } },
-        { $group: { _id: "$institution", count: { $sum: 1 } } },
-      ]),
-    ]);
-    const studentMap = Object.fromEntries(studentCounts.map((s) => [s._id.toString(), s.count]));
-    const officerMap = Object.fromEntries(officerCounts.map((s) => [s._id.toString(), s.count]));
-    const institutionsWithCounts = institutions.map((inst) => ({
-      ...inst.toObject(),
-      studentCount: studentMap[inst._id.toString()] || 0,
-      officerCount: officerMap[inst._id.toString()] || 0,
-    }));
+    let institutions = [];
+    let total = 0;
+    
+    if (status === "pending" || status === "rejected") {
+      const [requests, reqTotal] = await Promise.all([
+        InstitutionRequest.find(filter)
+          .sort({ createdAt: -1 })
+          .skip(skip)
+          .limit(parseInt(limit)),
+        InstitutionRequest.countDocuments(filter),
+      ]);
+      institutions = requests.map(req => ({
+        ...req.toObject(),
+        isRequest: true,
+        studentCount: 0,
+        officerCount: 0,
+      }));
+      total = reqTotal;
+    } else if (status === "active" || status === "suspended") {
+      const [insts, instTotal] = await Promise.all([
+        Institution.find(filter)
+          .populate("primaryAdmin", "name email isActive")
+          .sort({ createdAt: -1 })
+          .skip(skip)
+          .limit(parseInt(limit)),
+        Institution.countDocuments(filter),
+      ]);
+      
+      const ids = insts.map((i) => i._id);
+      const [studentCounts, officerCounts] = await Promise.all([
+        User.aggregate([
+          { $match: { institution: { $in: ids }, role: "member" } },
+          { $group: { _id: "$institution", count: { $sum: 1 } } },
+        ]),
+        User.aggregate([
+          { $match: { institution: { $in: ids }, role: "officer" } },
+          { $group: { _id: "$institution", count: { $sum: 1 } } },
+        ]),
+      ]);
+      const studentMap = Object.fromEntries(studentCounts.map((s) => [s._id.toString(), s.count]));
+      const officerMap = Object.fromEntries(officerCounts.map((s) => [s._id.toString(), s.count]));
+      institutions = insts.map((inst) => ({
+        ...inst.toObject(),
+        isRequest: false,
+        studentCount: studentMap[inst._id.toString()] || 0,
+        officerCount: officerMap[inst._id.toString()] || 0,
+      }));
+      total = instTotal;
+    } else {
+      // If no status provided, we fetch both but prioritize pending at the top
+      // This is a simplified merge since full combined pagination is complex
+      const [requests, insts] = await Promise.all([
+        InstitutionRequest.find(filter).sort({ createdAt: -1 }).limit(10),
+        Institution.find(filter).populate("primaryAdmin", "name email isActive").sort({ createdAt: -1 }).limit(10)
+      ]);
+      
+      const mappedRequests = requests.map(req => ({ ...req.toObject(), isRequest: true, studentCount: 0, officerCount: 0 }));
+      const ids = insts.map((i) => i._id);
+      const [studentCounts, officerCounts] = await Promise.all([
+        User.aggregate([
+          { $match: { institution: { $in: ids }, role: "member" } },
+          { $group: { _id: "$institution", count: { $sum: 1 } } },
+        ]),
+        User.aggregate([
+          { $match: { institution: { $in: ids }, role: "officer" } },
+          { $group: { _id: "$institution", count: { $sum: 1 } } },
+        ]),
+      ]);
+      const studentMap = Object.fromEntries(studentCounts.map((s) => [s._id.toString(), s.count]));
+      const officerMap = Object.fromEntries(officerCounts.map((s) => [s._id.toString(), s.count]));
+      const mappedInsts = insts.map((inst) => ({
+        ...inst.toObject(),
+        isRequest: false,
+        studentCount: studentMap[inst._id.toString()] || 0,
+        officerCount: officerMap[inst._id.toString()] || 0,
+      }));
+      
+      institutions = [...mappedRequests, ...mappedInsts];
+      total = await InstitutionRequest.countDocuments(filter) + await Institution.countDocuments(filter);
+    }
 
     return successResponse(
       res,
       200,
       "Institutions fetched",
       {
-        institutions: institutionsWithCounts,
+        institutions,
         total,
         page: parseInt(page),
         totalPages: Math.ceil(
@@ -496,22 +528,63 @@ const createInstitution = async (req, res) => {
 // ─────────────────────────────────────────────────────────────────────────────
 const approveInstitution = async (req, res) => {
   try {
-    const institution = await Institution.findById(req.params.id);
-    if (!institution) return errorResponse(res, 404, "Institution not found");
+    const request = await InstitutionRequest.findById(req.params.id);
+    if (!request) return errorResponse(res, 404, "Institution request not found");
 
-    institution.status = "active";
-    institution.approvedBy = req.user._id;
-    institution.approvedAt = new Date();
-    institution.rejectionReason = "";
-    institution.suspensionReason = "";
+    if (request.status !== "pending") {
+      return errorResponse(res, 400, "Institution is not pending");
+    }
+
+    // 1. Create Institution
+    const institution = await Institution.create({
+      name: request.name,
+      shortName: request.shortName,
+      type: request.type,
+      website: request.website,
+      description: request.description,
+      logo: request.logo,
+      registrationContactName: request.registrationContactName,
+      contactEmail: request.contactEmail,
+      contactPhone: request.contactPhone,
+      address: request.address,
+      status: "active",
+      isActive: true,
+      approvedBy: req.user._id,
+      approvedAt: new Date(),
+    });
+
+    // 2. Create User (Admin)
+    const adminUser = await User.create({
+      name: request.primaryAdminName,
+      email: request.primaryAdminEmail,
+      password: request.password,
+      role: "collegeAdmin",
+      institution: institution._id,
+      academicStatus: "NOT_APPLICABLE",
+      placementStatus: "NOT_APPLICABLE",
+      employmentStatus: "NOT_APPLICABLE",
+      isActive: true,
+      isEmailVerified: true,
+    });
+
+    institution.primaryAdmin = adminUser._id;
     await institution.save();
 
-    if (institution.primaryAdmin) {
-      await User.findByIdAndUpdate(institution.primaryAdmin, {
-        isActive: true,
-        isEmailVerified: true,
-      });
+    // 3. Create Domains
+    for (const domain of request.emailDomains) {
+      const taken = await InstitutionDomain.findOne({ domain });
+      if (!taken) {
+        await InstitutionDomain.create({
+          institution: institution._id,
+          domain,
+          allowedFor: ["student"],
+          isActive: true,
+        });
+      }
     }
+
+    // 4. Delete Request
+    await InstitutionRequest.findByIdAndDelete(request._id);
 
     await writeAudit(req, {
       action: "APPROVE_INSTITUTION",
@@ -531,18 +604,14 @@ const rejectInstitution = async (req, res) => {
     const { reason } = req.body;
     if (!reason?.trim()) return errorResponse(res, 400, "Rejection reason is required");
 
-    const institution = await Institution.findById(req.params.id);
-    if (!institution) return errorResponse(res, 404, "Institution not found");
+    const request = await InstitutionRequest.findById(req.params.id);
+    if (!request) return errorResponse(res, 404, "Institution request not found");
 
-    institution.status = "rejected";
-    institution.rejectionReason = reason.trim();
-    await institution.save();
+    request.status = "rejected";
+    request.rejectionReason = reason.trim();
+    await request.save();
 
-    if (institution.primaryAdmin) {
-      await User.findByIdAndUpdate(institution.primaryAdmin, { isActive: false });
-    }
-
-    return successResponse(res, 200, "Institution rejected", institution);
+    return successResponse(res, 200, "Institution rejected", request);
   } catch (err) {
     return errorResponse(res, 500, err.message);
   }
