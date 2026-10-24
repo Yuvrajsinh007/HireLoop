@@ -26,6 +26,7 @@ import ExperienceDetail from './pages/experience/ExperienceDetail';
 
 // Student Pages
 import StudentDashboard from './pages/student/StudentDashboard';
+import MyExperiences from './pages/student/MyExperiences';
 import JourneyTracker from './pages/student/JourneyTracker';
 import Profile from './pages/student/Profile';
 import SavedExperiences from './pages/student/SavedExperiences';
@@ -84,7 +85,6 @@ const App = () => {
                 <Route element={<ProtectedRoute />}>
                   <Route path="/companies" element={<CompanyList />} />
                   <Route path="/companies/:id" element={<CompanyPage />} />
-                  <Route path="/drives" element={<DriveList />} />
                   <Route path="/drives/:id" element={<DriveDetail />} />
                   <Route path="/experiences" element={<ExperienceFeed />} />
                   <Route
@@ -100,7 +100,9 @@ const App = () => {
 
                 <Route element={<ProtectedRoute studentOnly />}>
                   <Route path="/dashboard" element={<StudentDashboard />} />
+                  <Route path="/drives" element={<DriveList />} />
                   <Route path="/journey" element={<JourneyTracker />} />
+                  <Route path="/my-experiences" element={<MyExperiences />} /> {/* Add this line */}
                 </Route>
 
                 <Route

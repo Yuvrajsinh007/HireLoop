@@ -25,36 +25,32 @@ const userSchema = new mongoose.Schema(
       select: false,
     },
 
-    // ─── System Role (controls dashboard + API access) ────────────────────
-    // superAdmin  = platform owner
+    // ─── System Role ─────────────────────────────────────────────────────────
+    // superAdmin   = platform owner
     // collegeAdmin = manages one institution
-    // officer     = placement operations staff
-    // member      = student
+    // officer      = placement operations staff
+    // member       = student
     role: {
       type: String,
       enum: ["superAdmin", "collegeAdmin", "officer", "member"],
       default: "member",
     },
 
-    // ─── Institution (tenant) ─────────────────────────────────────────────
-    // null only for superAdmin
+    // ─── Institution (tenant) ────────────────────────────────────────────────
     institution: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "Institution",
       default: null,
     },
 
-    // ─── Academic Lifecycle Status ────────────────────────────────────────
-    // ENROLLED       = current active student
-    // FINAL_YEAR     = in final year of study
-    // NOT_APPLICABLE = for officers, admins, superAdmins
+    // ─── Academic Lifecycle Status ───────────────────────────────────────────
     academicStatus: {
       type: String,
       enum: ["ENROLLED", "FINAL_YEAR", "GRADUATED", "NOT_APPLICABLE"],
       default: "ENROLLED",
     },
 
-    // ─── Placement / Career Status ────────────────────────────────────────
+    // ─── Placement / Career Status ───────────────────────────────────────────
     placementStatus: {
       type: String,
       enum: [
@@ -68,7 +64,7 @@ const userSchema = new mongoose.Schema(
       default: "UNPLACED",
     },
 
-    // ─── Employment Status (relevant after graduation) ────────────────────
+    // ─── Employment Status ───────────────────────────────────────────────────
     employmentStatus: {
       type: String,
       enum: ["STUDENT", "INTERN", "WORKING", "SEEKING", "HIGHER_STUDIES", "NOT_APPLICABLE"],
@@ -83,46 +79,51 @@ const userSchema = new mongoose.Schema(
     isActive: { type: Boolean, default: true },
     lastLogin: { type: Date, default: null },
 
-    // ─── Email Verification OTP ───────────────────────────────────────────
+    // ─── Email Verification OTP ──────────────────────────────────────────────
     emailVerifyOtp:         { type: String,  select: false },
     emailVerifyOtpExpire:   { type: Date,    select: false },
     emailVerifyOtpAttempts: { type: Number,  default: 0,    select: false },
 
-    // ─── Login OTP ────────────────────────────────────────────────────────
+    // ─── Login OTP ───────────────────────────────────────────────────────────
     loginOtp:               { type: String,  select: false },
     loginOtpExpire:         { type: Date,    select: false },
     loginOtpAttempts:       { type: Number,  default: 0,    select: false },
 
-    // ─── Password Reset OTP ───────────────────────────────────────────────
+    // ─── Password Reset OTP ──────────────────────────────────────────────────
     resetOtp:               { type: String,  select: false },
     resetOtpExpire:         { type: Date,    select: false },
     resetOtpAttempts:       { type: Number,  default: 0,    select: false },
     resetOtpVerified:       { type: Boolean, default: false, select: false },
 
-    // ─── Shared OTP rate limiting ─────────────────────────────────────────
+    // ─── Shared OTP rate limiting ────────────────────────────────────────────
     lastOtpSentAt:          { type: Date,    select: false },
   },
   { timestamps: true }
 );
 
-// ─── Hash password before saving ──────────────────────────────────────────
+// ─── Hash password before saving (Promise-based, no `next`) ──────────────────
 userSchema.pre("save", async function () {
   if (!this.isModified("password")) return;
+
+  // Skip hashing if already a bcrypt hash (avoids double hashing on migration)
+  if (/^\$2[abxy]\$\d{2}\$[./A-Za-z0-9]{53}$/.test(this.password)) {
+    return;
+  }
+
   const salt = await bcrypt.genSalt(12);
   this.password = await bcrypt.hash(this.password, salt);
 });
 
-// ─── Compare password ──────────────────────────────────────────────────────
+// ─── Compare password ────────────────────────────────────────────────────────
 userSchema.methods.matchPassword = async function (enteredPassword) {
   return await bcrypt.compare(enteredPassword, this.password);
 };
 
-// ─── isCurrentStudent helper ──────────────────────────────────────────────
+// Virtuals & Indexes
 userSchema.virtual("isCurrentStudent").get(function () {
   return ["ENROLLED", "FINAL_YEAR"].includes(this.academicStatus);
 });
 
-// ─── Avatar fallback ──────────────────────────────────────────────────────
 userSchema.virtual("avatarUrl").get(function () {
   return (
     this.avatar ||
@@ -130,7 +131,6 @@ userSchema.virtual("avatarUrl").get(function () {
   );
 });
 
-// ─── Index for institution-scoped queries ─────────────────────────────────
 userSchema.index({ institution: 1, role: 1 });
 userSchema.index({ institution: 1, academicStatus: 1 });
 

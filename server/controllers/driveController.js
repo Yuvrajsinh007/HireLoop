@@ -60,59 +60,30 @@ const getDrive = async (req, res) => {
 };
 
 // ─── GET ELIGIBLE DRIVES FOR CURRENT STUDENT ─────────────────────────────
-// GET /api/drives/eligible
+// GET /api/drives/eligible (For Students)
 const getEligibleDrives = async (req, res) => {
   try {
+    // 1. Fetch the logged-in student's academic profile
     const profile = await MemberProfile.findOne({ user: req.user._id });
-    if (!profile) return errorResponse(res, 404, "Profile not found");
-
-    const filter = tenantFilter(req, {
-      status: { $in: ["UPCOMING", "ACTIVE"] },
-    });
-
-    // Filter by program eligibility if student has a program set
-    if (profile.program) {
-      filter.$or = [
-        { eligiblePrograms: { $size: 0 } },       // empty = all programs eligible
-        { eligiblePrograms: profile.program },     // student's program in eligible list
-      ];
+    
+    if (!profile || !profile.program || !profile.cgpa) {
+      return errorResponse(res, 400, "Please complete your academic profile to see eligible drives.");
     }
 
-    // Filter by CGPA
-    if (profile.cgpa) {
-      filter.$and = [
-        { $or: [{ minCGPA: { $lte: profile.cgpa } }, { minCGPA: 0 }] },
-      ];
-    }
+    // 2. The Eligibility Engine Query
+    const eligibleDrives = await PlacementDrive.find({
+      status: { $in: ["ACTIVE", "UPCOMING"] },
+      institution: req.user.institution,
+      minCGPA: { $lte: profile.cgpa }, // Drive CGPA must be <= Student CGPA
+      maxBacklogs: { $gte: profile.activeBacklogs || 0 }, // Drive Backlogs must be >= Student Backlogs
+      eligiblePrograms: profile.program, // Student's branch must be in the array
+      $or: [
+        { graduationYears: { $size: 0 } }, // If array is empty, all batches allowed
+        { graduationYears: profile.graduationYear } // Or student's batch must match
+      ]
+    }).populate("company", "name logo industry");
 
-    // Filter by graduation year
-    if (profile.graduationYear) {
-      filter.$and = filter.$and || [];
-      filter.$and.push({
-        $or: [
-          { graduationYears: { $size: 0 } },
-          { graduationYears: profile.graduationYear },
-        ],
-      });
-    }
-
-    // Filter by active backlogs
-    if (profile.activeBacklogs !== undefined && profile.activeBacklogs !== null) {
-      filter.$and = filter.$and || [];
-      filter.$and.push({
-        $or: [
-          { maxBacklogs: { $gte: profile.activeBacklogs } },
-          { maxBacklogs: 0 },
-        ],
-      });
-    }
-
-    const drives = await PlacementDrive.find(filter)
-      .populate("company",          "name logo industry")
-      .populate("eligiblePrograms", "name code")
-      .sort({ driveDate: 1 });
-
-    return successResponse(res, 200, "Eligible drives fetched", drives);
+    return successResponse(res, 200, "Eligible drives fetched", eligibleDrives);
   } catch (err) {
     return errorResponse(res, 500, err.message);
   }

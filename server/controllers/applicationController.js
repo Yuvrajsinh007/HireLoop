@@ -1,4 +1,5 @@
 const Application  = require("../models/Application");
+const PlacementDrive = require("../models/PlacementDrive");
 const MemberProfile= require("../models/MemberProfile");
 const Notification = require("../models/Notification");
 const { successResponse, errorResponse } = require("../utils/apiResponse");
@@ -27,6 +28,65 @@ const getMyApplications = async (req, res) => {
       page:       parseInt(page),
       totalPages: Math.ceil(total / parseInt(limit)),
     });
+  } catch (err) {
+    return errorResponse(res, 500, err.message);
+  }
+};
+
+// POST /api/drives/:id/apply
+const applyForDrive = async (req, res) => {
+  try {
+    const driveId = req.params.id;
+    const studentId = req.user._id;
+
+    const drive = await Drive.findById(driveId);
+    if (!drive) return errorResponse(res, 404, "Drive not found");
+    
+    // 1. Basic Status Check
+    if (drive.status !== "ACTIVE") {
+      return errorResponse(res, 400, "This drive is not accepting applications.");
+    }
+
+    // 2. 🔒 SECURITY ENFORCEMENT: Strict Deadline Check
+    if (drive.applicationDeadline) {
+      const deadline = new Date(drive.applicationDeadline);
+      deadline.setHours(23, 59, 59, 999); // Allow applying until 11:59:59 PM of the deadline day
+      if (new Date() > deadline) {
+        return errorResponse(res, 403, "The registration deadline for this drive has passed.");
+      }
+    }
+
+    // 3. Check if already applied
+    const existingApp = await Application.findOne({ drive: driveId, student: studentId });
+    if (existingApp) return errorResponse(res, 400, "You have already applied for this drive.");
+
+    // 4. Double-check mathematical eligibility (The Security Lock)
+    const profile = await MemberProfile.findOne({ user: studentId });
+    if (!profile) return errorResponse(res, 404, "Student profile not found.");
+    
+    if (profile.cgpa < drive.minCGPA) {
+      return errorResponse(res, 403, `Eligibility failed: Minimum CGPA ${drive.minCGPA} required.`);
+    }
+    if (profile.activeBacklogs > drive.maxBacklogs) {
+      return errorResponse(res, 403, `Eligibility failed: Maximum ${drive.maxBacklogs} backlogs allowed.`);
+    }
+    if (drive.eligiblePrograms.length > 0 && !drive.eligiblePrograms.includes(profile.program)) {
+      return errorResponse(res, 403, "Eligibility failed: Your branch is not eligible.");
+    }
+    if (drive.graduationYears.length > 0 && !drive.graduationYears.includes(profile.graduationYear)) {
+      return errorResponse(res, 403, "Eligibility failed: Your graduation batch is not eligible.");
+    }
+
+    // 5. Create the Application
+    const application = await Application.create({
+      drive: drive._id,
+      student: studentId,
+      company: drive.company,
+      status: "APPLIED",
+      appliedAt: new Date()
+    });
+
+    return successResponse(res, 201, "Successfully applied for the drive!", application);
   } catch (err) {
     return errorResponse(res, 500, err.message);
   }
@@ -273,6 +333,7 @@ const verifyOffer = async (req, res) => {
 };
 
 module.exports = {
+  applyForDrive,
   getMyApplications,
   addApplication,
   updateStage,

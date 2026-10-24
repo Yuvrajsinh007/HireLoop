@@ -5,18 +5,18 @@ const Notification     = require("../models/Notification");
 const { uploadToCloudinary, deleteFromCloudinary } = require("../config/cloudinary");
 const { successResponse, errorResponse } = require("../utils/apiResponse");
 const { tenantFilter, verifyTenantOwnership } = require("../middleware/tenantMiddleware");
+const { computeProfileCompleteness } = require("../utils/profileCompleteness");
 
 // ─── GET MY PROFILE ────────────────────────────────────────────────────────
 // GET /api/members/profile
 const getProfile = async (req, res) => {
   try {
     let profile = await MemberProfile.findOne({ user: req.user._id })
-      .populate("user",         "name email avatar role academicStatus placementStatus employmentStatus isEmailVerified alternateEmail")
-      .populate("institution",  "name shortName logo")
+      .populate("user", "name email avatar role academicStatus placementStatus employmentStatus isEmailVerified alternateEmail")
+      .populate("institution", "name shortName logo")
       .populate("academicUnit", "name code")
-      .populate("program",      "name code degreeType durationYears");
+      .populate("program", "name code degreeType durationYears");
 
-    // If a staff/admin doesn't have a student MemberProfile document, send a fallback structure
     if (!profile) {
       profile = {
         user: req.user,
@@ -28,7 +28,13 @@ const getProfile = async (req, res) => {
       };
     }
 
-    return successResponse(res, 200, "Profile fetched", profile);
+    // Attach profile completeness calculations
+    const completeness = computeProfileCompleteness(req.user, profile);
+
+    return successResponse(res, 200, "Profile fetched", {
+      ...profile.toObject ? profile.toObject() : profile,
+      completeness 
+    });
   } catch (err) {
     return errorResponse(res, 500, err.message);
   }
@@ -38,36 +44,28 @@ const getProfile = async (req, res) => {
 // PUT /api/members/profile
 const updateProfile = async (req, res) => {
   try {
-    const {
-      rollNumber, academicUnit, program, enrollmentYear, graduationYear,
-      cgpa, activeBacklogs, skills, linkedIn, github, portfolio, bio,
-      currentCompany, currentRole, currentCTC,
-      alternateEmail,
-    } = req.body;
+    // 1. Extract alternateEmail from the rest of the profile data
+    const { alternateEmail, ...profileData } = req.body;
 
-    // Update MemberProfile
-    const profile = await MemberProfile.findOneAndUpdate(
+    // 2. Update the MemberProfile database
+    const updatedProfile = await MemberProfile.findOneAndUpdate(
       { user: req.user._id },
-      {
-        rollNumber, academicUnit, program, enrollmentYear, graduationYear,
-        cgpa, activeBacklogs, skills, linkedIn, github, portfolio, bio,
-        currentCompany, currentRole, currentCTC,
-      },
+      profileData,
       { new: true, runValidators: true }
-    )
-      .populate("academicUnit", "name")
-      .populate("program", "name degreeType");
+    );
 
-    if (!profile) return errorResponse(res, 404, "Profile not found");
-
-    // Update alternate email on User if provided
-    if (alternateEmail !== undefined) {
-      await User.findByIdAndUpdate(req.user._id, { alternateEmail });
+    if (!updatedProfile) {
+      return errorResponse(res, 404, "Profile not found");
     }
 
-    return successResponse(res, 200, "Profile updated successfully", profile);
-  } catch (err) {
-    return errorResponse(res, 500, err.message);
+    // 3. Update the User database with the alternate email!
+    if (alternateEmail !== undefined) {
+      await User.findByIdAndUpdate(req.user._id, { alternateEmail: alternateEmail });
+    }
+
+    return successResponse(res, 200, "Profile updated successfully", updatedProfile);
+  } catch (error) {
+    return errorResponse(res, 500, error.message);
   }
 };
 
@@ -75,7 +73,7 @@ const updateProfile = async (req, res) => {
 // POST /api/members/avatar
 const uploadAvatar = async (req, res) => {
   try {
-    if (!req.file) return errorResponse(res, 400, "No image file provided");
+    if (!req.file) return errorResponse(res, 400, "No image file provided. Please attach a file.");
 
     const result = await uploadToCloudinary(req.file.buffer, "hireloop/avatars", "image");
 
@@ -84,8 +82,8 @@ const uploadAvatar = async (req, res) => {
     }
 
     await User.findByIdAndUpdate(req.user._id, {
-      avatar:         result.secure_url,
-      avatarPublicId:  result.public_id,
+      avatar: result.secure_url,
+      avatarPublicId: result.public_id,
     });
 
     return successResponse(res, 200, "Avatar updated", { avatarUrl: result.secure_url });
@@ -98,7 +96,7 @@ const uploadAvatar = async (req, res) => {
 // POST /api/members/resume
 const uploadResume = async (req, res) => {
   try {
-    if (!req.file) return errorResponse(res, 400, "No PDF file provided");
+    if (!req.file) return errorResponse(res, 400, "No PDF file provided. Please attach a file.");
 
     const result = await uploadToCloudinary(req.file.buffer, "hireloop/resumes", "raw");
 

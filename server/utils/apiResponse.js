@@ -1,3 +1,5 @@
+// apiResponse.js
+
 /**
  * Send a success response
  * @param {Object} res - Express response object

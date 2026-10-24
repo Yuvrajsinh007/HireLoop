@@ -8,25 +8,27 @@ import {
   CheckCircle2,
   ClipboardCheck,
   Globe,
+  KeyRound,
   Loader2,
   Mail,
   Phone,
   ShieldCheck,
   UserRound,
 } from "lucide-react";
-import API from "../../services/api" // Ensure you import your API service
+import API from "../../services/api";
 
 const RegisterInstitution = () => {
   const [loading, setLoading] = useState(false);
   const [submitted, setSubmitted] = useState(false);
 
   const [formData, setFormData] = useState({
-    institutionName: "",
+    name: "",
     shortName: "",
     domain: "",
     contactName: "",
     officialEmail: "",
     phoneNumber: "",
+    password: "",
   });
 
   const handleChange = (event) => {
@@ -40,12 +42,37 @@ const RegisterInstitution = () => {
     event.preventDefault();
     try {
       setLoading(true);
-      // Connects to your backend institution registration endpoint
-      await API.post("/institutions/register", formData);
+
+      // Clean domain suffix (strip leading @ or http)
+      const cleanDomain = formData.domain
+        .toLowerCase()
+        .trim()
+        .replace(/^@/, "")
+        .replace(/^https?:\/\//, "");
+
+      // Payload matched to backend InstitutionRequest model & controller
+      const payload = {
+        name: formData.name.trim(),
+        shortName: formData.shortName.trim().toUpperCase(),
+        registrationContactName: formData.contactName.trim(),
+        contactEmail: formData.officialEmail.trim().toLowerCase(),
+        contactPhone: formData.phoneNumber.trim(),
+        primaryAdminName: formData.contactName.trim(),
+        primaryAdminEmail: formData.officialEmail.trim().toLowerCase(),
+        password: formData.password,
+        emailDomains: cleanDomain ? [cleanDomain] : [],
+      };
+
+      // Call public endpoint
+      await API.post("/super-admin/institutions/register", payload);
+
       setSubmitted(true);
       toast.success("Institution registration request submitted successfully.");
     } catch (err) {
-      toast.error(err?.response?.data?.message || "Failed to submit institution request.");
+      toast.error(
+        err?.response?.data?.message ||
+          "Failed to submit institution request. Please verify all fields."
+      );
     } finally {
       setLoading(false);
     }
@@ -89,11 +116,12 @@ const RegisterInstitution = () => {
               </h2>
 
               <p className="mx-auto mt-3 max-w-sm text-sm leading-6 text-slate-500">
-                Our team will review your domain registration and contact you at{" "}
+                Our team will review your domain registration and activate your
+                administrator workspace for{" "}
                 <strong className="font-bold text-slate-700">
                   {formData.officialEmail}
-                </strong>{" "}
-                upon activation.
+                </strong>
+                .
               </p>
 
               <Link
@@ -109,14 +137,14 @@ const RegisterInstitution = () => {
               <div className="border-b border-slate-100 bg-amber-50/70 px-6 py-4 sm:px-8">
                 <div className="flex items-start gap-3">
                   <ShieldCheck className="mt-0.5 h-5 w-5 shrink-0 text-amber-700" />
-
                   <div>
                     <p className="text-sm font-bold text-amber-950">
                       Domain mapping required
                     </p>
-
                     <p className="mt-1 text-xs leading-5 text-amber-800">
-                      Provide your official web domain (e.g., ctu.edu) so students logging in with that suffix match your portal automatically.
+                      Provide your official student email suffix (e.g.{" "}
+                      <code>ctu.edu</code>) so users from your university are
+                      grouped under your college workspace.
                     </p>
                   </div>
                 </div>
@@ -124,17 +152,20 @@ const RegisterInstitution = () => {
 
               <form onSubmit={handleSubmit} className="space-y-4 p-6 sm:p-8">
                 <div>
-                  <label htmlFor="institutionName" className="block text-sm font-bold text-slate-700">
-                    Institution name
+                  <label
+                    htmlFor="name"
+                    className="block text-sm font-bold text-slate-700"
+                  >
+                    Institution name *
                   </label>
                   <div className="relative mt-2">
                     <Building2 className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
                     <input
-                      id="institutionName"
-                      name="institutionName"
+                      id="name"
+                      name="name"
                       type="text"
                       required
-                      value={formData.institutionName}
+                      value={formData.name}
                       onChange={handleChange}
                       placeholder="e.g. California Tech University"
                       className="w-full rounded-xl border border-slate-200 bg-slate-50 py-3 pl-10 pr-4 text-sm text-slate-900 outline-none transition focus:border-amber-500 focus:bg-white focus:ring-4 focus:ring-amber-500/10"
@@ -144,8 +175,11 @@ const RegisterInstitution = () => {
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
-                    <label htmlFor="shortName" className="block text-sm font-bold text-slate-700">
-                      Short Code / Acronym
+                    <label
+                      htmlFor="shortName"
+                      className="block text-sm font-bold text-slate-700"
+                    >
+                      Short Code / Acronym *
                     </label>
                     <input
                       id="shortName"
@@ -155,13 +189,16 @@ const RegisterInstitution = () => {
                       value={formData.shortName}
                       onChange={handleChange}
                       placeholder="e.g. CTU"
-                      className="w-full mt-2 rounded-xl border border-slate-200 bg-slate-50 py-3 px-4 text-sm text-slate-900 outline-none transition focus:border-amber-500 focus:bg-white focus:ring-4 focus:ring-amber-500/10"
+                      className="w-full mt-2 rounded-xl border border-slate-200 bg-slate-50 py-3 px-4 text-sm text-slate-900 uppercase outline-none transition focus:border-amber-500 focus:bg-white focus:ring-4 focus:ring-amber-500/10"
                     />
                   </div>
 
                   <div>
-                    <label htmlFor="domain" className="block text-sm font-bold text-slate-700">
-                      Email Domain Suffix
+                    <label
+                      htmlFor="domain"
+                      className="block text-sm font-bold text-slate-700"
+                    >
+                      Email Domain Suffix *
                     </label>
                     <div className="relative mt-2">
                       <Globe className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
@@ -180,8 +217,11 @@ const RegisterInstitution = () => {
                 </div>
 
                 <div>
-                  <label htmlFor="contactName" className="block text-sm font-bold text-slate-700">
-                    Contact person
+                  <label
+                    htmlFor="contactName"
+                    className="block text-sm font-bold text-slate-700"
+                  >
+                    College Admin Name *
                   </label>
                   <div className="relative mt-2">
                     <UserRound className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
@@ -192,15 +232,18 @@ const RegisterInstitution = () => {
                       required
                       value={formData.contactName}
                       onChange={handleChange}
-                      placeholder="Your full name"
+                      placeholder="e.g. Dr. Jane Doe"
                       className="w-full rounded-xl border border-slate-200 bg-slate-50 py-3 pl-10 pr-4 text-sm text-slate-900 outline-none transition focus:border-amber-500 focus:bg-white focus:ring-4 focus:ring-amber-500/10"
                     />
                   </div>
                 </div>
 
                 <div>
-                  <label htmlFor="officialEmail" className="block text-sm font-bold text-slate-700">
-                    Official work email
+                  <label
+                    htmlFor="officialEmail"
+                    className="block text-sm font-bold text-slate-700"
+                  >
+                    Admin Official Email *
                   </label>
                   <div className="relative mt-2">
                     <Mail className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
@@ -218,8 +261,37 @@ const RegisterInstitution = () => {
                 </div>
 
                 <div>
-                  <label htmlFor="phoneNumber" className="block text-sm font-bold text-slate-700">
-                    Phone number <span className="font-medium text-slate-400">(optional)</span>
+                  <label
+                    htmlFor="password"
+                    className="block text-sm font-bold text-slate-700"
+                  >
+                    Workspace Admin Password *
+                  </label>
+                  <div className="relative mt-2">
+                    <KeyRound className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                    <input
+                      id="password"
+                      name="password"
+                      type="password"
+                      required
+                      minLength={6}
+                      value={formData.password}
+                      onChange={handleChange}
+                      placeholder="At least 6 characters"
+                      className="w-full rounded-xl border border-slate-200 bg-slate-50 py-3 pl-10 pr-4 text-sm text-slate-900 outline-none transition focus:border-amber-500 focus:bg-white focus:ring-4 focus:ring-amber-500/10"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label
+                    htmlFor="phoneNumber"
+                    className="block text-sm font-bold text-slate-700"
+                  >
+                    Phone number{" "}
+                    <span className="font-medium text-slate-400">
+                      (optional)
+                    </span>
                   </label>
                   <div className="relative mt-2">
                     <Phone className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
@@ -243,7 +315,7 @@ const RegisterInstitution = () => {
                   {loading ? (
                     <>
                       <Loader2 className="h-4 w-4 animate-spin" />
-                      Submitting request
+                      Submitting request...
                     </>
                   ) : (
                     <>
@@ -257,8 +329,11 @@ const RegisterInstitution = () => {
               <div className="border-t border-slate-100 bg-slate-50 px-6 py-4 text-center sm:px-8">
                 <p className="text-sm text-slate-500">
                   Already registered?{" "}
-                  <Link to="/register" className="font-bold text-emerald-700 hover:text-emerald-800">
-                    Create a student profile
+                  <Link
+                    to="/login"
+                    className="font-bold text-amber-800 hover:text-amber-900"
+                  >
+                    Sign into your workspace
                   </Link>
                 </p>
               </div>

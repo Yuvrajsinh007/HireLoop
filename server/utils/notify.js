@@ -1,3 +1,6 @@
+// notify.js
+
+
 const Notification = require("../models/Notification");
 const { sendNotificationToUser } = require("../socket/socketHandler");
 

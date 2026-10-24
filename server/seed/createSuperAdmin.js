@@ -27,7 +27,6 @@ const run = async () => {
     existing.employmentStatus = "NOT_APPLICABLE";
     existing.isEmailVerified = true;
     await existing.save();
-    console.log(`✅ Existing user ${email} promoted to superAdmin`);
   } else {
     await User.create({
       name,
@@ -41,7 +40,7 @@ const run = async () => {
       isActive: true,
       isEmailVerified: true,
     });
-    console.log(`✅ Super Admin created: ${email}`);
+    console.log(`Super Admin created: ${email}`);
   }
 
   await mongoose.disconnect();

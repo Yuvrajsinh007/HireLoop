@@ -1,3 +1,5 @@
+// sendEmail.js
+
 const nodemailer = require("nodemailer");
 const { brevo, defaultSender } = require("../config/brevo");
 
@@ -7,6 +9,8 @@ const loginOtpTemplate           = require("../templates/loginOtpEmail");
 const passwordResetOtpTemplate   = require("../templates/passwordResetEmail");
 const placementAlertTemplate     = require("../templates/placementAlertEmail");
 const staffInviteEmailTemplate   = require("../templates/staffInviteEmail"); // <-- Added
+const suspensionEmailTemplate = require("../templates/suspensionEmail");
+const reactivationEmailTemplate = require("../templates/reactivationEmail");
 
 // ─── SMTP Fallback ─────────────────────────────────────────────────────────
 const sendViaSMTP = async (toEmail, name, subject, html) => {
@@ -32,7 +36,6 @@ const sendViaSMTP = async (toEmail, name, subject, html) => {
     text: "Please enable HTML to view this email.",
   });
 
-  console.log(`Email sent via SMTP to ${toEmail} | MessageId: ${info.messageId}`);
   return { success: true, messageId: info.messageId };
 };
 
@@ -51,11 +54,9 @@ const sendEmail = async ({ to, name, subject, html }) => {
       htmlContent: html,
     });
 
-    console.log(`Email sent via Brevo to ${to}`);
     return result;
   } catch (error) {
     console.error(`Brevo send failed to ${to}:`, error.message);
-    console.log("Attempting SMTP fallback...");
     return await sendViaSMTP(to, name, subject, html);
   }
 };
@@ -115,6 +116,24 @@ const sendStaffInviteEmail = async ({ to, name, role, tempPassword }) => {
   });
 };
 
+/** Institution Suspension Alert */
+const sendSuspensionEmail = async ({ to, name, institutionName, reason }) => {
+  await sendEmail({
+    to, name,
+    subject: "Urgent: Your HireLoop Institution Account has been Suspended",
+    html: suspensionEmailTemplate(name, institutionName, reason),
+  });
+};
+
+/** Institution Reactivation Alert */
+const sendReactivationEmail = async ({ to, name, institutionName }) => {
+  await sendEmail({
+    to, name,
+    subject: "Resolved: Your HireLoop Institution Account has been Reactivated",
+    html: reactivationEmailTemplate(name, institutionName, `${process.env.CLIENT_URL}/login`),
+  });
+};
+
 module.exports = {
   sendEmail,
   sendWelcomeEmail,
@@ -123,4 +142,6 @@ module.exports = {
   sendPasswordResetOtpEmail,
   sendPlacementAlertEmail,
   sendStaffInviteEmail,
+  sendSuspensionEmail,
+  sendReactivationEmail,
 };

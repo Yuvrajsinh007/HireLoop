@@ -1,3 +1,5 @@
+// ProfileCompleteness.js
+
 const computeProfileCompleteness = (user, profile) => {
   const missing = [];
   const checks = [

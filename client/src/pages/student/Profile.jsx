@@ -4,12 +4,13 @@ import Avatar from "../../components/common/Avatar";
 import Loader from "../../components/common/Loader";
 import OtpInput from "../../components/common/OtpInput";
 import { useAuth } from "../../hooks/useAuth";
+import api from "../../services/api";
 import { getMemberProfile, updateMemberProfile, uploadAvatar, uploadResume } from "../../services/memberService";
 import { sendVerifyOtp, verifyEmailOtp } from "../../services/authService";
-import { formatDate } from "../../utils/formatDate";
+import { isMember } from "../../utils/roleHelpers";
 import toast from "react-hot-toast";
 import { motion, AnimatePresence } from "framer-motion";
-import { CheckCircle, Mail, Loader2, Edit2, X, FileText, Upload, Briefcase } from "lucide-react";
+import { CheckCircle, Mail, Loader2, Edit2, X, FileText, Upload, ShieldCheck, UserRound, Lock } from "lucide-react";
 
 const SKILL_SUGGESTIONS = [
   "React", "Node.js", "MongoDB", "Express", "JavaScript", "Python", "Java",
@@ -24,58 +25,63 @@ const Profile = () => {
   const avatarInputRef = useRef(null);
   const resumeInputRef = useRef(null);
 
+  const studentView = isMember(user);
+
+  const [activeTab, setActiveTab] = useState("general"); 
   const [profile, setProfile]     = useState(null);
   const [loading, setLoading]     = useState(true);
   const [saving, setSaving]       = useState(false);
   const [uploading, setUploading] = useState("");
   const [editMode, setEditMode]   = useState(false);
   const [skillInput, setSkillInput] = useState("");
-  const [topicInput, setTopicInput] = useState("");
 
-  // Email Verification OTP state
   const [showVerifySection, setShowVerifySection] = useState(false);
   const [otpSent, setOtpSent]     = useState(false);
   const [otp, setOtp]             = useState("");
   const [verifyLoading, setVerifyLoading] = useState(false);
   const [cooldown, setCooldown]   = useState(0);
 
+  const [passwordForm, setPasswordForm] = useState({
+    currentPassword: "", newPassword: "", confirmPassword: ""
+  });
+
   const [form, setForm] = useState({
     rollNumber: "", enrollmentYear: "", graduationYear: "", cgpa: "", activeBacklogs: 0,
     skills: [], linkedIn: "", github: "", portfolio: "", bio: "", alternateEmail: "",
-    currentCompany: "", currentRole: "", currentCTC: ""
   });
 
   useEffect(() => {
-    const fetchProfile = async () => {
+    const fetchProfileData = async () => {
       try {
         setLoading(true);
-        const res = await getMemberProfile(); // Maps to getProfile in controller
-        const p   = res.data.data;
+        const res = await getMemberProfile();
+        const p = res.data.data;
         setProfile(p);
-        setForm({
-          rollNumber: p.rollNumber || "",
-          enrollmentYear: p.enrollmentYear || "",
-          graduationYear: p.graduationYear || "",
-          cgpa: p.cgpa || "",
-          activeBacklogs: p.activeBacklogs || 0,
-          skills: p.skills || [],
-          linkedIn: p.linkedIn || "",
-          github: p.github || "",
-          portfolio: p.portfolio || "",
-          bio: p.bio || "",
-          alternateEmail: p.user?.alternateEmail || "",
-          currentCompany: p.currentCompany || "",
-          currentRole: p.currentRole || "",
-          currentCTC: p.currentCTC || "",
-        });
+        
+        if (studentView) {
+          setForm({
+            rollNumber: p.rollNumber || "",
+            enrollmentYear: p.enrollmentYear || "",
+            graduationYear: p.graduationYear || "",
+            cgpa: p.cgpa || "",
+            activeBacklogs: p.activeBacklogs || 0,
+            skills: p.skills || [],
+            linkedIn: p.linkedIn || "",
+            github: p.github || "",
+            portfolio: p.portfolio || "",
+            bio: p.bio || "",
+            alternateEmail: p.user?.alternateEmail || "",
+          });
+        }
       } catch (err) {
-        toast.error("Failed to load profile");
+        toast.error("Failed to load profile details");
       } finally {
         setLoading(false);
       }
     };
-    fetchProfile();
-  }, []);
+    
+    fetchProfileData();
+  }, [studentView]);
 
   const startCooldown = () => {
     setCooldown(COOLDOWN);
@@ -121,8 +127,13 @@ const Profile = () => {
   };
 
   const handleChange = (e) => {
-    const { name, value, type, checked } = e.target;
-    setForm((p) => ({ ...p, [name]: type === "checkbox" ? checked : value }));
+    const { name, value } = e.target;
+    setForm((p) => ({ ...p, [name]: value }));
+  };
+
+  const handlePasswordChange = (e) => {
+    const { name, value } = e.target;
+    setPasswordForm((p) => ({ ...p, [name]: value }));
   };
 
   const addArrayItem = (field, value, setInput) => {
@@ -135,16 +146,45 @@ const Profile = () => {
   const removeArrayItem = (field, value) =>
     setForm((p) => ({ ...p, [field]: p[field].filter((item) => item !== value) }));
 
-  const handleSave = async () => {
+    const handleSaveProfile = async () => {
+      try {
+        setSaving(true);
+        
+        // 1. Send the update
+        await updateMemberProfile(form); 
+        
+        // 2. RE-FETCH the fully populated profile to prevent fields going blank!
+        const freshProfileRes = await getMemberProfile();
+        setProfile(freshProfileRes.data.data);
+        
+        setEditMode(false);
+        
+        // 3. Update the local Auth Context
+        if (form.alternateEmail) updateUser({ alternateEmail: form.alternateEmail });
+        
+        toast.success("Profile updated successfully ✅");
+      } catch (err) {
+        toast.error(err?.response?.data?.message || "Failed to update profile");
+      } finally {
+        setSaving(false);
+      }
+    };
+
+  const handleUpdatePassword = async (e) => {
+    e.preventDefault();
+    if (passwordForm.newPassword !== passwordForm.confirmPassword) {
+      return toast.error("New passwords do not match.");
+    }
     try {
       setSaving(true);
-      const res = await updateMemberProfile(form); // Maps to updateProfile in controller
-      setProfile(res.data.data);
-      setEditMode(false);
-      if (form.alternateEmail) updateUser({ alternateEmail: form.alternateEmail });
-      toast.success("Profile updated successfully ✅");
+      await api.put("/auth/change-password", {
+        currentPassword: passwordForm.currentPassword,
+        newPassword: passwordForm.newPassword
+      });
+      toast.success("Password updated securely ✅");
+      setPasswordForm({ currentPassword: "", newPassword: "", confirmPassword: "" });
     } catch (err) {
-      toast.error(err?.response?.data?.message || "Failed to update profile");
+      toast.error(err?.response?.data?.message || "Failed to update password");
     } finally {
       setSaving(false);
     }
@@ -176,295 +216,359 @@ const Profile = () => {
   if (loading) return (
     <DashboardLayout>
       <div className="flex items-center justify-center min-h-[60vh]">
-        <Loader size="lg" text="Loading profile..." />
+        <Loader size="lg" text="Loading settings..." />
       </div>
     </DashboardLayout>
   );
 
-  // Animation variants
-  const containerVariants = {
-    hidden: { opacity: 0 },
-    show: {
-      opacity: 1,
-      transition: { staggerChildren: 0.1 }
-    }
-  };
-
-  const itemVariants = {
-    hidden: { opacity: 0, y: 20 },
-    show: { opacity: 1, y: 0, transition: { duration: 0.4 } }
-  };
+  const containerVariants = { hidden: { opacity: 0 }, show: { opacity: 1, transition: { staggerChildren: 0.1 } } };
+  const itemVariants = { hidden: { opacity: 0, y: 20 }, show: { opacity: 1, y: 0, transition: { duration: 0.4 } } };
 
   return (
     <DashboardLayout>
-      <motion.div 
-        variants={containerVariants}
-        initial="hidden"
-        animate="show"
-        className="max-w-4xl mx-auto py-8 px-4 sm:px-6 lg:px-8"
-      >
-        {/* Header */}
-        <motion.div variants={itemVariants} className="flex items-center justify-between mb-8">
-          <div>
-            <h1 className="text-2xl font-bold text-gray-900">My Profile</h1>
-            <p className="text-sm text-gray-500 mt-1">Manage your academic and professional details</p>
+      <motion.div variants={containerVariants} initial="hidden" animate="show" className="max-w-4xl mx-auto py-8 px-4 sm:px-6 lg:px-8">
+        
+        {/* Header & Tabs */}
+        <motion.div variants={itemVariants} className="mb-8">
+          <h1 className="text-2xl font-bold text-gray-900 tracking-tight">Account Settings</h1>
+          <p className="text-sm text-gray-500 mt-1">Manage your personal profile and security preferences.</p>
+          
+          <div className="mt-6 border-b border-gray-200">
+            <nav className="-mb-px flex space-x-8">
+              <button
+                onClick={() => setActiveTab("general")}
+                className={`whitespace-nowrap pb-4 px-1 border-b-2 font-medium text-sm flex items-center transition-colors ${
+                  activeTab === "general" ? "border-indigo-500 text-indigo-600" : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
+                }`}
+              >
+                <UserRound className="w-4 h-4 mr-2" /> Profile Info
+              </button>
+              <button
+                onClick={() => setActiveTab("security")}
+                className={`whitespace-nowrap pb-4 px-1 border-b-2 font-medium text-sm flex items-center transition-colors ${
+                  activeTab === "security" ? "border-indigo-500 text-indigo-600" : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
+                }`}
+              >
+                <Lock className="w-4 h-4 mr-2" /> Security
+              </button>
+            </nav>
           </div>
-          {!editMode ? (
-            <button onClick={() => setEditMode(true)} className="inline-flex items-center px-4 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 transition-colors">
-              <Edit2 className="w-4 h-4 mr-2 text-gray-500" /> Edit Profile
-            </button>
-          ) : (
-            <div className="flex gap-3">
-              <button onClick={() => setEditMode(false)} className="inline-flex items-center px-4 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 transition-colors">
-                Cancel
-              </button>
-              <button onClick={handleSave} disabled={saving} className="inline-flex items-center px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 disabled:opacity-70 transition-colors">
-                {saving ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : "Save Changes"}
-              </button>
-            </div>
-          )}
         </motion.div>
 
-        {/* ── Email Verification Banner ── */}
-        <AnimatePresence>
-          {!user?.isEmailVerified && (
-            <motion.div variants={itemVariants} exit={{ opacity: 0, height: 0 }} className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-6 shadow-sm">
-              <div className="flex items-start justify-between gap-4 flex-wrap">
-                <div className="flex items-start gap-3">
-                  <Mail className="w-5 h-5 text-yellow-600 mt-0.5 flex-shrink-0" />
-                  <div>
-                    <p className="font-semibold text-yellow-800 text-sm">Email not verified</p>
-                    <p className="text-sm text-yellow-700 mt-0.5">
-                      Verify your institutional email <strong>{user?.email}</strong> to unlock placement features.
-                    </p>
-                  </div>
-                </div>
-                {!showVerifySection && (
-                  <button
-                    onClick={() => setShowVerifySection(true)}
-                    className="text-sm font-semibold text-yellow-800 bg-yellow-200 hover:bg-yellow-300 px-4 py-2 rounded-md transition-colors flex-shrink-0"
-                  >
-                    Verify Email
+        {activeTab === "general" && (
+          <motion.div variants={containerVariants} initial="hidden" animate="show">
+            
+            {/* Header Actions */}
+            {studentView && (
+              <div className="flex justify-end mb-4">
+                {!editMode ? (
+                  <button onClick={() => setEditMode(true)} className="inline-flex items-center px-4 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 transition-colors">
+                    <Edit2 className="w-4 h-4 mr-2 text-gray-500" /> Edit Details
                   </button>
+                ) : (
+                  <div className="flex gap-3">
+                    <button onClick={() => setEditMode(false)} className="inline-flex items-center px-4 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 transition-colors">
+                      Cancel
+                    </button>
+                    <button onClick={handleSaveProfile} disabled={saving} className="inline-flex items-center px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 disabled:opacity-70 transition-colors">
+                      {saving ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : "Save Changes"}
+                    </button>
+                  </div>
                 )}
               </div>
+            )}
 
-              {/* OTP Section */}
-              <AnimatePresence>
-                {showVerifySection && (
-                  <motion.div 
-                    initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }} exit={{ opacity: 0, height: 0 }}
-                    className="mt-4 pt-4 border-t border-yellow-200"
-                  >
-                    {!otpSent ? (
-                      <div className="flex items-center justify-between gap-3 flex-wrap">
-                        <p className="text-sm text-yellow-700">Click below to receive a 6-digit OTP on your email.</p>
-                        <button onClick={handleSendVerifyOtp} disabled={verifyLoading} className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-yellow-600 hover:bg-yellow-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-yellow-500 disabled:opacity-70">
-                          {verifyLoading ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : "Send OTP"}
-                        </button>
-                      </div>
-                    ) : (
-                      <div className="space-y-4 max-w-md">
-                        <p className="text-sm text-yellow-700">
-                          OTP sent to <strong>{user?.email}</strong>. Enter it below:
+            {/* Email Verification Banner */}
+            <AnimatePresence>
+              {!user?.isEmailVerified && (
+                <motion.div variants={itemVariants} exit={{ opacity: 0, height: 0 }} className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-6 shadow-sm">
+                  <div className="flex items-start justify-between gap-4 flex-wrap">
+                    <div className="flex items-start gap-3">
+                      <Mail className="w-5 h-5 text-yellow-600 mt-0.5 flex-shrink-0" />
+                      <div>
+                        <p className="font-semibold text-yellow-800 text-sm">Email not verified</p>
+                        <p className="text-sm text-yellow-700 mt-0.5">
+                          Verify your email <strong>{user?.email}</strong> to unlock full platform features.
                         </p>
-                        <OtpInput value={otp} onChange={setOtp} disabled={verifyLoading} />
-                        <div className="flex items-center gap-3">
-                          <button onClick={handleVerifyEmailOtp} disabled={verifyLoading || otp.length !== 6} className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 disabled:opacity-70">
-                            {verifyLoading ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : "Verify OTP"}
-                          </button>
-                          {cooldown > 0 ? (
-                            <span className="text-sm text-yellow-700">Resend in {cooldown}s</span>
-                          ) : (
-                            <button onClick={handleSendVerifyOtp} disabled={verifyLoading} className="text-sm text-indigo-600 hover:text-indigo-800 font-medium transition-colors">
-                              Resend OTP
-                            </button>
-                          )}
-                        </div>
                       </div>
+                    </div>
+                    {!showVerifySection && (
+                      <button onClick={() => setShowVerifySection(true)} className="text-sm font-semibold text-yellow-800 bg-yellow-200 hover:bg-yellow-300 px-4 py-2 rounded-md transition-colors flex-shrink-0">
+                        Verify Email
+                      </button>
                     )}
-                  </motion.div>
-                )}
-              </AnimatePresence>
-            </motion.div>
-          )}
-        </AnimatePresence>
+                  </div>
 
-        {/* Verified Badge */}
-        {user?.isEmailVerified && (
-          <motion.div variants={itemVariants} className="bg-green-50 border border-green-200 rounded-lg p-4 mb-6 shadow-sm flex items-center gap-3">
-            <CheckCircle className="w-5 h-5 text-green-600" />
-            <p className="text-sm font-medium text-green-800">Your institutional email is verified.</p>
+                  {/* OTP Section */}
+                  <AnimatePresence>
+                    {showVerifySection && (
+                      <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }} exit={{ opacity: 0, height: 0 }} className="mt-4 pt-4 border-t border-yellow-200">
+                        {!otpSent ? (
+                          <div className="flex items-center justify-between gap-3 flex-wrap">
+                            <p className="text-sm text-yellow-700">Click below to receive a 6-digit OTP on your email.</p>
+                            <button onClick={handleSendVerifyOtp} disabled={verifyLoading} className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-yellow-600 hover:bg-yellow-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-yellow-500 disabled:opacity-70">
+                              {verifyLoading ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : "Send OTP"}
+                            </button>
+                          </div>
+                        ) : (
+                          <div className="space-y-4 max-w-md">
+                            <p className="text-sm text-yellow-700">OTP sent to <strong>{user?.email}</strong>. Enter it below:</p>
+                            <OtpInput value={otp} onChange={setOtp} disabled={verifyLoading} />
+                            <div className="flex items-center gap-3">
+                              <button onClick={handleVerifyEmailOtp} disabled={verifyLoading || otp.length !== 6} className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 disabled:opacity-70">
+                                {verifyLoading ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : "Verify OTP"}
+                              </button>
+                              {cooldown > 0 ? (
+                                <span className="text-sm text-yellow-700">Resend in {cooldown}s</span>
+                              ) : (
+                                <button onClick={handleSendVerifyOtp} disabled={verifyLoading} className="text-sm text-indigo-600 hover:text-indigo-800 font-medium transition-colors">
+                                  Resend OTP
+                                </button>
+                              )}
+                            </div>
+                          </div>
+                        )}
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+                </motion.div>
+              )}
+            </AnimatePresence>
+
+            {user?.isEmailVerified && (
+              <motion.div variants={itemVariants} className="bg-emerald-50 border border-emerald-200 rounded-lg p-4 mb-6 shadow-sm flex items-center gap-3">
+                <CheckCircle className="w-5 h-5 text-emerald-600" />
+                <p className="text-sm font-medium text-emerald-800">Your email address is verified securely.</p>
+              </motion.div>
+            )}
+
+            {/* Identity Card (Visible to All) */}
+            <motion.div variants={itemVariants} className="bg-white shadow rounded-lg p-6 mb-6 border border-gray-100">
+              <div className="flex flex-col sm:flex-row items-start sm:items-center gap-6">
+                <div className="relative group">
+                  <Avatar src={user?.avatarUrl} name={user?.name} size="xl" />
+                  <button
+                    onClick={() => avatarInputRef.current?.click()}
+                    className="absolute bottom-0 right-0 w-8 h-8 bg-indigo-600 rounded-full flex items-center justify-center text-white shadow-lg hover:bg-indigo-700 transition-colors"
+                    title="Update Avatar"
+                  >
+                    {uploading === "avatar" ? <Loader2 className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />}
+                  </button>
+                  <input ref={avatarInputRef} type="file" accept="image/*" className="hidden" onChange={(e) => handleFileUpload(e, "avatar")} />
+                </div>
+
+                <div className="flex-1">
+                  <h2 className="text-2xl font-bold text-gray-900">{user?.name}</h2>
+                  <p className="text-gray-500 text-sm mb-2">{user?.email}</p>
+                  <div className="flex flex-wrap gap-2">
+                    <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold bg-indigo-100 text-indigo-800 capitalize tracking-wider">
+                      {user?.role}
+                    </span>
+                    {user?.institution && (
+                      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold bg-gray-100 text-gray-800 tracking-wider">
+                        {user.institution.name}
+                      </span>
+                    )}
+                  </div>
+                </div>
+
+                {/* Resume Upload - Only for Students */}
+                {studentView && (
+                  <div className="w-full sm:w-auto flex flex-col items-stretch sm:items-end gap-2 mt-4 sm:mt-0">
+                    {profile?.resumeUrl ? (
+                      <>
+                        <a href={profile.resumeUrl} target="_blank" rel="noopener noreferrer" className="inline-flex items-center justify-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-indigo-700 bg-indigo-50 hover:bg-indigo-100 transition-colors">
+                          <FileText className="w-4 h-4 mr-2" /> View Resume
+                        </a>
+                        <button onClick={() => resumeInputRef.current?.click()} className="text-xs text-gray-500 hover:text-indigo-600 text-center sm:text-right font-medium transition-colors">
+                          {uploading === "resume" ? "Uploading..." : "Replace Document"}
+                        </button>
+                      </>
+                    ) : (
+                      <button onClick={() => resumeInputRef.current?.click()} className="inline-flex items-center justify-center px-4 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 transition-colors">
+                        {uploading === "resume" ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Upload className="w-4 h-4 mr-2 text-gray-500" />} Upload Resume
+                      </button>
+                    )}
+                    <input ref={resumeInputRef} type="file" accept=".pdf" className="hidden" onChange={(e) => handleFileUpload(e, "resume")} />
+                  </div>
+                )}
+              </div>
+            </motion.div>
+
+            {/* Academic Info - Strictly Read-Only */}
+            {studentView && (
+              <motion.div variants={itemVariants} className="bg-white shadow rounded-lg p-6 mb-6 border border-gray-100">
+                <h3 className="text-lg font-bold text-gray-900 mb-4 border-b border-gray-100 pb-3">Academic Details</h3>
+                
+                <div className="bg-blue-50 border border-blue-200 p-3 rounded-lg mb-6 text-sm text-blue-800">
+                  <strong>Note:</strong> Your Institution, Institute, and Branch are locked to verify your eligibility for placement drives. Contact your administrator if these need changing.
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 mb-6">
+                  <div>
+                    <label className="block text-xs uppercase tracking-wider font-bold text-gray-500">University</label>
+                    <p className="mt-1 text-sm text-gray-900 font-medium">{profile?.institution?.name || "—"}</p>
+                  </div>
+                  <div>
+                    <label className="block text-xs uppercase tracking-wider font-bold text-gray-500">Institution</label>
+                    <p className="mt-1 text-sm text-gray-900 font-medium">{profile?.academicUnit?.name || "—"}</p>
+                  </div>
+                  <div>
+                    <label className="block text-xs uppercase tracking-wider font-bold text-gray-500">Program / Branch</label>
+                    <p className="mt-1 text-sm text-gray-900 font-medium">{profile?.program?.name || "—"}</p>
+                  </div>
+                </div>
+
+                <hr className="border-gray-100 mb-6" />
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+                  {[
+                    { label: "Roll Number", name: "rollNumber", type: "text" },
+                    { label: "Enrollment Year", name: "enrollmentYear", type: "number", min: "2000" },
+                    { label: "Graduation Year", name: "graduationYear", type: "number", min: "2020" },
+                    { label: "CGPA", name: "cgpa", type: "number", step: "0.01", min: "0", max: "10" },
+                    { label: "Active Backlogs", name: "activeBacklogs", type: "number", min: "0" }, // Min 0 enforced here
+                  ].map((f) => (
+                    <div key={f.name}>
+                      <label className="block text-xs uppercase tracking-wider font-bold text-gray-500">{f.label}</label>
+                      {editMode ? (
+                        <input 
+                          type={f.type} 
+                          name={f.name} 
+                          value={form[f.name]} 
+                          onChange={handleChange} 
+                          step={f.step}
+                          min={f.min}
+                          max={f.max}
+                          className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm transition-colors" 
+                        />
+                      ) : (
+                        <p className="mt-1 text-sm text-gray-900 font-medium">{profile?.[f.name] ?? "—"}</p>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </motion.div>
+            )}
+
+            {/* Skills - Only for Students */}
+            {studentView && (
+              <motion.div variants={itemVariants} className="bg-white shadow rounded-lg p-6 mb-6 border border-gray-100">
+                <h3 className="text-lg font-bold text-gray-900 mb-4 border-b border-gray-100 pb-3">Technical Skills</h3>
+                <div className="flex flex-wrap gap-2 mb-4">
+                  {(editMode ? form.skills : profile?.skills || []).map((skill) => (
+                    <span key={skill} className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-indigo-50 text-indigo-700 border border-indigo-100 shadow-sm">
+                      {skill}
+                      {editMode && (
+                        <button onClick={() => removeArrayItem("skills", skill)} className="ml-1.5 inline-flex text-indigo-400 hover:text-indigo-600 focus:outline-none">
+                          <X className="w-3.5 h-3.5" />
+                        </button>
+                      )}
+                    </span>
+                  ))}
+                  {(!editMode && !profile?.skills?.length) && <p className="text-sm text-gray-400 italic">No skills added yet.</p>}
+                </div>
+
+                {editMode && (
+                  <div className="space-y-4">
+                    <div className="flex gap-2">
+                      <input type="text" value={skillInput} onChange={(e) => setSkillInput(e.target.value)} onKeyDown={(e) => e.key === "Enter" && addArrayItem("skills", skillInput, setSkillInput)}
+                        className="block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm" placeholder="Type a skill and press Enter" />
+                      <button type="button" onClick={() => addArrayItem("skills", skillInput, setSkillInput)} className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 transition-colors">
+                        Add
+                      </button>
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      {SKILL_SUGGESTIONS.filter((s) => !form.skills.includes(s)).map((s) => (
+                        <button key={s} type="button" onClick={() => addArrayItem("skills", s, setSkillInput)}
+                          className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium border border-gray-300 text-gray-600 hover:bg-gray-50 hover:text-indigo-600 hover:border-indigo-300 transition-colors">
+                          + {s}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </motion.div>
+            )}
+
+            {/* Bio & Social Links - Only for Students */}
+            {studentView && (
+              <motion.div variants={itemVariants} className="bg-white shadow rounded-lg p-6 mb-6 border border-gray-100">
+                <h3 className="text-lg font-bold text-gray-900 mb-4 border-b border-gray-100 pb-3">Bio & Social Links</h3>
+                <div className="space-y-6">
+                  <div>
+                    <label className="block text-xs uppercase tracking-wider font-bold text-gray-500">Professional Summary</label>
+                    {editMode ? (
+                      <textarea name="bio" value={form.bio} onChange={handleChange} rows={3}
+                        className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm resize-none transition-colors" placeholder="Tell recruiters about yourself..." />
+                    ) : (
+                      <p className="mt-1 text-sm text-gray-900 bg-gray-50 p-4 rounded-lg border border-gray-100 min-h-[3rem] shadow-inner">{profile?.bio || <span className="text-gray-400 italic">No bio provided.</span>}</p>
+                    )}
+                  </div>
+                  
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+                    {[
+                      { label: "LinkedIn URL", name: "linkedIn", placeholder: "https://linkedin.com/in/username" },
+                      { label: "GitHub URL", name: "github", placeholder: "https://github.com/username" },
+                      { label: "Portfolio Website", name: "portfolio", placeholder: "https://yourwebsite.com" },
+                    ].map((link) => (
+                      <div key={link.name}>
+                        <label className="block text-xs uppercase tracking-wider font-bold text-gray-500">{link.label}</label>
+                        {editMode ? (
+                          <input type={link.name === "alternateEmail" ? "email" : "url"} name={link.name} value={form[link.name]} onChange={handleChange}
+                            className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm transition-colors" placeholder={link.placeholder} />
+                        ) : form[link.name] ? (
+                          <a href={link.name === "alternateEmail" ? `mailto:${form[link.name]}` : form[link.name]} target="_blank" rel="noopener noreferrer" className="mt-1 block text-sm font-medium text-indigo-600 hover:text-indigo-800 hover:underline truncate">
+                            {form[link.name]}
+                          </a>
+                        ) : (
+                          <p className="mt-1 text-sm text-gray-400 italic">Not provided</p>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </motion.div>
+            )}
           </motion.div>
         )}
 
-        {/* Avatar & Basic Info Card */}
-        <motion.div variants={itemVariants} className="bg-white shadow rounded-lg p-6 mb-6 border border-gray-100">
-          <div className="flex flex-col sm:flex-row items-start sm:items-center gap-6">
-            <div className="relative group">
-              <Avatar src={user?.avatarUrl} name={user?.name} size="xl" />
-              <button
-                onClick={() => avatarInputRef.current?.click()}
-                className="absolute bottom-0 right-0 w-8 h-8 bg-indigo-600 rounded-full flex items-center justify-center text-white shadow-lg hover:bg-indigo-700 transition-colors"
-                title="Update Avatar"
-              >
-                {uploading === "avatar" ? <Loader2 className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />}
-              </button>
-              <input ref={avatarInputRef} type="file" accept="image/*" className="hidden" onChange={(e) => handleFileUpload(e, "avatar")} />
-            </div>
-
-            <div className="flex-1">
-              <h2 className="text-2xl font-bold text-gray-900">{user?.name}</h2>
-              <p className="text-gray-500 text-sm mb-2">{user?.email}</p>
-              <div className="flex flex-wrap gap-2">
-                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800 capitalize">
-                  {user?.role}
-                </span>
-                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-800">
-                  {user?.academicStatus?.replace("_", " ")}
-                </span>
-                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
-                  {user?.employmentStatus}
-                </span>
+        {/* SECURITY TAB */}
+        {activeTab === "security" && (
+          <motion.div variants={containerVariants} initial="hidden" animate="show">
+            <motion.div variants={itemVariants} className="bg-white shadow rounded-lg p-6 border border-gray-100 max-w-2xl">
+              <div className="mb-6 border-b border-gray-100 pb-4">
+                <h3 className="text-lg font-bold text-gray-900 flex items-center"><ShieldCheck className="w-5 h-5 mr-2 text-indigo-500"/> Update Password</h3>
+                <p className="text-sm text-gray-500 mt-1">Ensure your account is using a long, random password to stay secure.</p>
               </div>
-            </div>
 
-            <div className="w-full sm:w-auto flex flex-col items-stretch sm:items-end gap-2 mt-4 sm:mt-0">
-              {profile?.resumeUrl ? (
-                <>
-                  <a href={profile.resumeUrl} target="_blank" rel="noopener noreferrer" className="inline-flex items-center justify-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-indigo-700 bg-indigo-100 hover:bg-indigo-200 transition-colors">
-                    <FileText className="w-4 h-4 mr-2" /> View Resume
-                  </a>
-                  <button onClick={() => resumeInputRef.current?.click()} className="text-xs text-gray-500 hover:text-indigo-600 text-center sm:text-right font-medium transition-colors">
-                    {uploading === "resume" ? "Uploading..." : "Replace Resume"}
-                  </button>
-                </>
-              ) : (
-                <button onClick={() => resumeInputRef.current?.click()} className="inline-flex items-center justify-center px-4 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 transition-colors">
-                  {uploading === "resume" ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Upload className="w-4 h-4 mr-2 text-gray-500" />} Upload Resume
-                </button>
-              )}
-              <input ref={resumeInputRef} type="file" accept=".pdf" className="hidden" onChange={(e) => handleFileUpload(e, "resume")} />
-            </div>
-          </div>
-        </motion.div>
-
-        {/* Academic Info */}
-        <motion.div variants={itemVariants} className="bg-white shadow rounded-lg p-6 mb-6 border border-gray-100">
-          <h3 className="text-lg font-medium text-gray-900 mb-4 border-b border-gray-100 pb-2">Academic Information</h3>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-            
-            {/* Read-only structured data */}
-            <div>
-              <label className="block text-sm font-medium text-gray-500">Institution</label>
-              <p className="mt-1 text-sm text-gray-900 font-medium">{profile?.institution?.name || "—"}</p>
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-500">Academic Unit</label>
-              <p className="mt-1 text-sm text-gray-900 font-medium">{profile?.academicUnit?.name || "—"}</p>
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-500">Program</label>
-              <p className="mt-1 text-sm text-gray-900 font-medium">{profile?.program?.name || "—"}</p>
-            </div>
-
-            {/* Editable data */}
-            {[
-              { label: "Roll Number", name: "rollNumber", type: "text" },
-              { label: "Enrollment Year", name: "enrollmentYear", type: "number" },
-              { label: "Graduation Year", name: "graduationYear", type: "number" },
-              { label: "CGPA", name: "cgpa", type: "number", step: "0.01" },
-              { label: "Active Backlogs", name: "activeBacklogs", type: "number" },
-            ].map((f) => (
-              <div key={f.name}>
-                <label className="block text-sm font-medium text-gray-700">{f.label}</label>
-                {editMode ? (
-                  <input type={f.type} name={f.name} value={form[f.name]} onChange={handleChange} step={f.step}
-                    className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm transition-colors" />
-                ) : (
-                  <p className="mt-1 text-sm text-gray-900 font-medium">{profile?.[f.name] ?? "—"}</p>
-                )}
-              </div>
-            ))}
-          </div>
-        </motion.div>
-
-        {/* Skills */}
-        <motion.div variants={itemVariants} className="bg-white shadow rounded-lg p-6 mb-6 border border-gray-100">
-          <h3 className="text-lg font-medium text-gray-900 mb-4 border-b border-gray-100 pb-2">Technical Skills</h3>
-          <div className="flex flex-wrap gap-2 mb-4">
-            {(editMode ? form.skills : profile?.skills || []).map((skill) => (
-              <span key={skill} className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-indigo-50 text-indigo-700 border border-indigo-100">
-                {skill}
-                {editMode && (
-                  <button onClick={() => removeArrayItem("skills", skill)} className="ml-1.5 inline-flex text-indigo-400 hover:text-indigo-600 focus:outline-none">
-                    <X className="w-3.5 h-3.5" />
-                  </button>
-                )}
-              </span>
-            ))}
-            {(!editMode && !profile?.skills?.length) && <p className="text-sm text-gray-400 italic">No skills added yet.</p>}
-          </div>
-
-          {editMode && (
-            <div className="space-y-4">
-              <div className="flex gap-2">
-                <input type="text" value={skillInput} onChange={(e) => setSkillInput(e.target.value)} onKeyDown={(e) => e.key === "Enter" && addArrayItem("skills", skillInput, setSkillInput)}
-                  className="block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm" placeholder="Type a skill and press Enter" />
-                <button type="button" onClick={() => addArrayItem("skills", skillInput, setSkillInput)} className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 transition-colors">
-                  Add
-                </button>
-              </div>
-              <div className="flex flex-wrap gap-2">
-                {SKILL_SUGGESTIONS.filter((s) => !form.skills.includes(s)).map((s) => (
-                  <button key={s} type="button" onClick={() => addArrayItem("skills", s, setSkillInput)}
-                    className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium border border-gray-300 text-gray-600 hover:bg-gray-50 hover:text-indigo-600 hover:border-indigo-300 transition-colors">
-                    + {s}
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
-        </motion.div>
-
-        {/* Bio & Social Links */}
-        <motion.div variants={itemVariants} className="bg-white shadow rounded-lg p-6 mb-6 border border-gray-100">
-          <h3 className="text-lg font-medium text-gray-900 mb-4 border-b border-gray-100 pb-2">Bio & Social Links</h3>
-          <div className="space-y-6">
-            <div>
-              <label className="block text-sm font-medium text-gray-700">Bio</label>
-              {editMode ? (
-                <textarea name="bio" value={form.bio} onChange={handleChange} rows={3}
-                  className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm resize-none transition-colors" placeholder="Tell recruiters about yourself..." />
-              ) : (
-                <p className="mt-1 text-sm text-gray-900 bg-gray-50 p-3 rounded-md border border-gray-100 min-h-[3rem]">{profile?.bio || <span className="text-gray-400 italic">No bio provided.</span>}</p>
-              )}
-            </div>
-            
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-              {[
-                { label: "LinkedIn", name: "linkedIn", placeholder: "https://linkedin.com/in/username" },
-                { label: "GitHub", name: "github", placeholder: "https://github.com/username" },
-                { label: "Portfolio", name: "portfolio", placeholder: "https://yourwebsite.com" },
-                { label: "Alternate Email", name: "alternateEmail", placeholder: "personal@gmail.com" },
-              ].map((link) => (
-                <div key={link.name}>
-                  <label className="block text-sm font-medium text-gray-700">{link.label}</label>
-                  {editMode ? (
-                    <input type={link.name === "alternateEmail" ? "email" : "url"} name={link.name} value={form[link.name]} onChange={handleChange}
-                      className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm transition-colors" placeholder={link.placeholder} />
-                  ) : form[link.name] ? (
-                    <a href={link.name === "alternateEmail" ? `mailto:${form[link.name]}` : form[link.name]} target="_blank" rel="noopener noreferrer" className="mt-1 block text-sm text-indigo-600 hover:text-indigo-800 hover:underline truncate">
-                      {form[link.name]}
-                    </a>
-                  ) : (
-                    <p className="mt-1 text-sm text-gray-400 italic">Not provided</p>
-                  )}
+              <form onSubmit={handleUpdatePassword} className="space-y-5">
+                <div>
+                  <label className="block text-sm font-bold text-gray-700 mb-1">Current Password</label>
+                  <input required type="password" name="currentPassword" value={passwordForm.currentPassword} onChange={handlePasswordChange}
+                    className="block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm" />
                 </div>
-              ))}
-            </div>
-          </div>
-        </motion.div>
+                <div>
+                  <label className="block text-sm font-bold text-gray-700 mb-1">New Password</label>
+                  <input required minLength={6} type="password" name="newPassword" value={passwordForm.newPassword} onChange={handlePasswordChange}
+                    className="block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm" placeholder="At least 6 characters" />
+                </div>
+                <div>
+                  <label className="block text-sm font-bold text-gray-700 mb-1">Confirm New Password</label>
+                  <input required minLength={6} type="password" name="confirmPassword" value={passwordForm.confirmPassword} onChange={handlePasswordChange}
+                    className="block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm" />
+                </div>
+
+                <div className="pt-4 flex justify-end">
+                  <button type="submit" disabled={saving} className="inline-flex items-center px-4 py-2 border border-transparent shadow-sm text-sm font-bold rounded-md text-white bg-indigo-600 hover:bg-indigo-700 disabled:opacity-70 transition-colors">
+                    {saving ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : "Update Password"}
+                  </button>
+                </div>
+              </form>
+            </motion.div>
+          </motion.div>
+        )}
+
       </motion.div>
     </DashboardLayout>
   );

@@ -1,3 +1,5 @@
+// staffInviteEmail.js
+
 const staffInviteEmailTemplate = (name, role, email, tempPassword, loginUrl) => {
     const roleName = role === "collegeAdmin" ? "College Admin" : "Placement Officer";
     

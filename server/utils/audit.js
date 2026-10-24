@@ -1,3 +1,5 @@
+// audit.js
+
 const AuditLog = require("../models/AuditLog");
 
 const writeAudit = async (req, { action, entity, entityId, meta = {} }) => {

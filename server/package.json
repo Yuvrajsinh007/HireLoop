@@ -29,6 +29,7 @@
   },
   "dependencies": {
     "@getbrevo/brevo": "^6.0.2",
+    "node-cron": "^4.6.0",
     "nodemailer": "^9.0.3"
   }
 }

@@ -27,12 +27,10 @@ export const SocketProvider = ({ children }) => {
     });
 
     newSocket.on("connect", () => {
-      console.log("🟢 Socket connected:", newSocket.id);
       setIsConnected(true);
     });
 
     newSocket.on("disconnect", () => {
-      console.log("🔴 Socket disconnected");
       setIsConnected(false);
     });
 

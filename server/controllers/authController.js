@@ -1,4 +1,7 @@
+const mongoose          = require("mongoose");
 const User              = require("../models/User");
+const AcademicUnit = require("../models/AcademicUnit");
+const Program = require("../models/Program");
 const MemberProfile     = require("../models/MemberProfile");
 const InstitutionDomain = require("../models/InstitutionDomain");
 const PendingRegistration = require("../models/PendingRegistration");
@@ -76,16 +79,14 @@ const startRegistration = async (req, res) => {
     const lookup = await findActiveDomain(normalized);
     if (lookup.error) return errorResponse(res, 400, lookup.error);
 
+    const institution = lookup.domainRecord.institution;
+
     let pending = await PendingRegistration.findOne({ email: normalized }).select(
       "+otpHash +otpExpire +otpAttempts +lastOtpSentAt"
     );
 
     if (pending && isOnCooldown(pending.lastOtpSentAt)) {
-      return errorResponse(
-        res,
-        429,
-        `Please wait ${cooldownLeft(pending.lastOtpSentAt)} seconds before requesting another OTP.`
-      );
+      return errorResponse(res, 429, `Please wait ${cooldownLeft(pending.lastOtpSentAt)} seconds before requesting another OTP.`);
     }
 
     const otp = generateOtp();
@@ -94,11 +95,11 @@ const startRegistration = async (req, res) => {
     if (!pending) {
       pending = new PendingRegistration({
         email: normalized,
-        institution: lookup.domainRecord.institution._id,
+        institution: institution._id,
       });
     }
 
-    pending.institution = lookup.domainRecord.institution._id;
+    pending.institution = institution._id;
     pending.otpHash = hashed;
     pending.otpExpire = new Date(Date.now() + 10 * 60 * 1000);
     pending.otpAttempts = 0;
@@ -113,21 +114,27 @@ const startRegistration = async (req, res) => {
       return errorResponse(res, 500, "Could not send OTP email. Try again.");
     }
 
+    // 2. FETCH THE COLLEGE'S INSTITUTES AND BRANCHES
+    const academicUnits = await AcademicUnit.find({ institution: institution._id, isActive: true }).select("name code");
+    const programs = await Program.find({ institution: institution._id, isActive: true }).select("name code degreeType academicUnit");
+
+    // 3. SEND THEM BACK TO THE FRONTEND
     return successResponse(res, 200, "OTP sent to your college email. Valid for 10 minutes.", {
       email: normalized,
       institution: {
-        _id: lookup.domainRecord.institution._id,
-        name: lookup.domainRecord.institution.name,
-        shortName: lookup.domainRecord.institution.shortName,
-        logo: lookup.domainRecord.institution.logo,
+        _id: institution._id,
+        name: institution.name,
+        shortName: institution.shortName,
+        logo: institution.logo,
       },
+      academicUnits, // Send the list of institutes
+      programs,      // Send the list of branches
       domain: lookup.domain,
     });
   } catch (error) {
     return errorResponse(res, 500, error.message);
   }
 };
-
 const verifyRegistrationOtp = async (req, res) => {
   try {
     const { email, otp } = req.body;
@@ -181,42 +188,48 @@ const verifyRegistrationOtp = async (req, res) => {
 };
 
 const completeRegistration = async (req, res) => {
+  const session = await mongoose.startSession();
+  session.startTransaction();
+
   try {
     const {
-      email,
-      name,
-      password,
-      phone,
-      dateOfBirth,
-      rollNumber,
-      academicUnit,
-      program,
-      enrollmentYear,
-      graduationYear,
-      cgpa,
-      activeBacklogs,
+      email, name, password, phone, dateOfBirth, rollNumber,
+      academicUnit, program, enrollmentYear, graduationYear,
+      cgpa, activeBacklogs, otp // Added OTP check here
     } = req.body;
 
-    if (!name || !email || !password)
+    if (!name || !email || !password) {
       return errorResponse(res, 400, "Name, email, and password are required");
+    }
 
-    if (password.length < 6)
+    if (password.length < 6) {
       return errorResponse(res, 400, "Password must be at least 6 characters");
+    }
 
     const normalized = email.trim().toLowerCase();
-    const pending = await PendingRegistration.findOne({ email: normalized });
-    if (!pending || !pending.verified)
+    
+    // Verify OTP explicitly if required by your flow, or rely on pending.verified
+    const pending = await PendingRegistration.findOne({ email: normalized }).session(session);
+    if (!pending || (!pending.verified && pending.otp !== otp)) {
+      await session.abortTransaction();
       return errorResponse(res, 403, "Please verify your college email OTP first.");
+    }
 
-    const existingUser = await User.findOne({ email: normalized });
-    if (existingUser) return errorResponse(res, 400, "Email already registered");
+    const existingUser = await User.findOne({ email: normalized }).session(session);
+    if (existingUser) {
+      await session.abortTransaction();
+      return errorResponse(res, 400, "Email already registered");
+    }
 
     const lookup = await findActiveDomain(normalized);
-    if (lookup.error) return errorResponse(res, 400, lookup.error);
+    if (lookup.error) {
+      await session.abortTransaction();
+      return errorResponse(res, 400, lookup.error);
+    }
 
     const institution = lookup.domainRecord.institution;
 
-    const user = await User.create({
+    const [user] = await User.create([{
       name,
       email: normalized,
       password,
@@ -228,9 +241,9 @@ const completeRegistration = async (req, res) => {
       placementStatus: "UNPLACED",
       employmentStatus: "STUDENT",
       isEmailVerified: true,
-    });
+    }], { session });
 
-    await MemberProfile.create({
+    await MemberProfile.create([{
       user: user._id,
       institution: institution._id,
       phone: phone || "",
@@ -242,9 +255,12 @@ const completeRegistration = async (req, res) => {
       graduationYear: graduationYear || null,
       cgpa: cgpa ?? null,
       activeBacklogs: activeBacklogs ?? 0,
-    });
+    }], { session });
 
-    await PendingRegistration.deleteOne({ _id: pending._id });
+    await PendingRegistration.deleteOne({ _id: pending._id }).session(session);
+
+    await session.commitTransaction();
+    session.endSession();
 
     try {
       await sendWelcomeEmail({ to: normalized, name });
@@ -252,11 +268,7 @@ const completeRegistration = async (req, res) => {
       console.error("Welcome email error (ignored):", e.message);
     }
 
-    await writeAudit(req, {
-      action: "student_registered",
-      entity: "User",
-      entityId: user._id,
-    });
+    await writeAudit(req, { action: "student_registered", entity: "User", entityId: user._id });
 
     const token = generateToken(user._id, user.role);
     return successResponse(res, 201, "Registration successful! Welcome to HireLoop.", {
@@ -264,6 +276,8 @@ const completeRegistration = async (req, res) => {
       user: buildUserPayload(user),
     });
   } catch (error) {
+    await session.abortTransaction();
+    session.endSession();
     console.error("Registration error:", error);
     return errorResponse(res, 500, error.message);
   }

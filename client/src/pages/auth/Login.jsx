@@ -50,8 +50,11 @@ const Login = () => {
     event.preventDefault();
     setError("");
     setIsLoading(true);
+
+    const cleanEmail = email.trim().toLowerCase();
+
     try {
-      await login(email, password);
+      await login(cleanEmail, password);
       toast.success("Welcome back to HireLoop.");
     } catch (err) {
       setError(err.response?.data?.message || "Invalid email or password.");
@@ -63,14 +66,15 @@ const Login = () => {
 
   const handleSendOtp = async (event) => {
     event.preventDefault();
-    if (!email) {
+    const cleanEmail = email.trim().toLowerCase();
+    if (!cleanEmail) {
       setError("Enter your email address first.");
       return;
     }
     setError("");
     setIsLoading(true);
     try {
-      const response = await api.post("/auth/send-login-otp", { email });
+      const response = await api.post("/auth/send-login-otp", { email: cleanEmail });
       setOtpSent(true);
       toast.success(response.data.message || "A verification code was sent.");
     } catch (err) {
@@ -84,8 +88,9 @@ const Login = () => {
     event.preventDefault();
     setError("");
     setIsLoading(true);
+    const cleanEmail = email.trim().toLowerCase();
     try {
-      const response = await api.post("/auth/verify-login-otp", { email, otp });
+      const response = await api.post("/auth/verify-login-otp", { email: cleanEmail, otp });
       const { token, user: userData } = response.data.data;
       updateUser({ ...userData, token });
       toast.success("You are signed in.");
@@ -107,12 +112,12 @@ const Login = () => {
 
   return (
     <div className="min-h-screen flex bg-white">
-      {/* Left side: Form */}
+      {/* Left side: Single Form for all roles */}
       <div className="flex-1 flex flex-col justify-center px-4 sm:px-6 lg:flex-none lg:w-[480px] xl:w-[560px] 2xl:w-[640px] shadow-2xl z-10 bg-white relative">
         <div className="mx-auto w-full max-w-sm lg:w-[400px]">
           
           <div className="mb-10 flex flex-col items-start">
-            <Link to="/" className="flex items-center gap-2 mb-10 group">
+            <Link to="/college-admin/dashboard" className="flex items-center gap-2 mb-10 group">
               <div className="w-8 h-8 rounded-lg bg-indigo-600 flex items-center justify-center shadow-lg shadow-indigo-600/20 group-hover:scale-105 transition-transform">
                 <GraduationCap className="w-5 h-5 text-white" />
               </div>
@@ -123,7 +128,7 @@ const Login = () => {
               Welcome back
             </h2>
             <p className="mt-2 text-sm text-gray-500 font-medium">
-              Access your campus placement workspace.
+              Access your student, college admin, or placement officer portal.
             </p>
           </div>
 
@@ -154,7 +159,7 @@ const Login = () => {
                 >
                   <div>
                     <label htmlFor="email" className="block text-sm font-bold text-gray-700">
-                      Email address
+                      Work or College Email
                     </label>
                     <div className="relative mt-2">
                       <Mail className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
@@ -220,7 +225,7 @@ const Login = () => {
                 >
                   <div>
                     <label htmlFor="otp-email" className="block text-sm font-bold text-gray-700">
-                      Email address
+                      Work or College Email
                     </label>
                     <div className="relative mt-2">
                       <Mail className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
@@ -288,19 +293,26 @@ const Login = () => {
               {isOtpMode ? "Sign in with password" : "Sign in with One-Time Password"}
             </button>
 
-            <p className="mt-8 text-center text-sm font-medium text-gray-500">
-              Don't have an account?{" "}
-              <Link to="/register" className="font-bold text-indigo-600 hover:text-indigo-500 transition-colors">
-                Create account
-              </Link>
-            </p>
+            <div className="mt-8 space-y-2 text-center text-sm font-medium text-gray-500">
+              <p>
+                Student?{" "}
+                <Link to="/register" className="font-bold text-indigo-600 hover:text-indigo-500 transition-colors">
+                  Create an account
+                </Link>
+              </p>
+              <p>
+                University not registered?{" "}
+                <Link to="/register-institution" className="font-bold text-indigo-600 hover:text-indigo-500 transition-colors">
+                  Register your institution
+                </Link>
+              </p>
+            </div>
           </div>
         </div>
       </div>
 
-      {/* Right side: SaaS Graphic/Info */}
+      {/* Right side: SaaS Graphic */}
       <div className="hidden lg:flex flex-1 flex-col justify-between bg-indigo-900 relative overflow-hidden">
-        {/* Abstract background shapes */}
         <div className="absolute -top-40 -right-40 w-96 h-96 rounded-full bg-indigo-600 blur-3xl opacity-50 pointer-events-none"></div>
         <div className="absolute top-1/2 left-0 w-72 h-72 rounded-full bg-indigo-500 blur-3xl opacity-30 pointer-events-none"></div>
         <div className="absolute -bottom-20 -left-20 w-80 h-80 rounded-full bg-indigo-800 blur-3xl opacity-60 pointer-events-none"></div>
@@ -316,14 +328,14 @@ const Login = () => {
               Connect top talent with leading companies.
             </h1>
             <p className="text-lg text-indigo-200 mb-12 max-w-lg leading-relaxed">
-              HireLoop is the unified platform for students, placement cells, and recruiters to seamlessly manage the entire hiring journey.
+              HireLoop is the unified platform for students, placement cells, and recruiters to manage the placement journey.
             </p>
             
             <div className="space-y-6">
               {[
                 { icon: <GraduationCap className="w-6 h-6" />, title: "Student Portfolios", desc: "Showcase skills, projects, and academics effortlessly." },
                 { icon: <Building2 className="w-6 h-6" />, title: "Drive Management", desc: "Automate shortlisting, interviews, and final offers." },
-                { icon: <Users className="w-6 h-6" />, title: "Interview Experiences", desc: "Read and share invaluable interview experiences to help juniors." },
+                { icon: <Users className="w-6 h-6" />, title: "Interview Experiences", desc: "Read and share interview experiences to guide peers." },
               ].map((feature, idx) => (
                 <div key={idx} className="flex items-start gap-4 p-4 rounded-2xl bg-indigo-800/30 border border-indigo-700/30 backdrop-blur-sm transition-colors hover:bg-indigo-800/40">
                   <div className="flex-shrink-0 p-3 rounded-xl bg-indigo-600/50 text-indigo-100">

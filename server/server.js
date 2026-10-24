@@ -11,6 +11,7 @@ dotenv.config();
 const connectDB        = require("./config/db");
 const { socketHandler }= require("./socket/socketHandler");
 const { notFound, errorHandler } = require("./middleware/errorMiddleware");
+const { initCronJobs } = require("./utils/cronJobs");
 
 // ─── Route Imports ─────────────────────────────────────────────────────────
 const authRoutes        = require("./routes/authRoutes");
@@ -44,6 +45,7 @@ const io = new Server(httpServer, {
 
 app.use((req, res, next) => { req.io = io; next(); });
 socketHandler(io);
+initCronJobs(io);
 
 // ─── Middleware ────────────────────────────────────────────────────────────
 app.use(helmet());

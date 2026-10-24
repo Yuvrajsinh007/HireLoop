@@ -20,7 +20,6 @@ const socketHandler = (io) => {
   });
 
   io.on("connection", (socket) => {
-    console.log(`🟢 Socket connected: ${socket.id} | User: ${socket.userId}`);
 
     // Store user's socket
     userSocketMap.set(socket.userId, socket.id);
@@ -31,7 +30,6 @@ const socketHandler = (io) => {
     // ─── Join company room (for company-specific updates) ──────────────
     socket.on("join:company", (companyId) => {
       socket.join(`company:${companyId}`);
-      console.log(`User ${socket.userId} joined company room: ${companyId}`);
     });
 
     socket.on("leave:company", (companyId) => {
@@ -40,12 +38,10 @@ const socketHandler = (io) => {
 
     // ─── Notification read ─────────────────────────────────────────────
     socket.on("notification:read", (notificationId) => {
-      console.log(`Notification ${notificationId} marked read by ${socket.userId}`);
     });
 
     // ─── Disconnect ────────────────────────────────────────────────────
     socket.on("disconnect", () => {
-      console.log(`🔴 Socket disconnected: ${socket.id} | User: ${socket.userId}`);
       userSocketMap.delete(socket.userId);
     });
   });
