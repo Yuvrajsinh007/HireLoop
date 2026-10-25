@@ -39,28 +39,29 @@ const applyForDrive = async (req, res) => {
     const driveId = req.params.id;
     const studentId = req.user._id;
 
-    const drive = await Drive.findById(driveId);
+    // 1. Fetch Drive and verify it exists
+    const drive = await PlacementDrive.findById(driveId);
     if (!drive) return errorResponse(res, 404, "Drive not found");
     
-    // 1. Basic Status Check
+    // 2. Basic Status Check
     if (drive.status !== "ACTIVE") {
       return errorResponse(res, 400, "This drive is not accepting applications.");
     }
 
-    // 2. 🔒 SECURITY ENFORCEMENT: Strict Deadline Check
+    // 3. Strict Deadline Check
     if (drive.applicationDeadline) {
       const deadline = new Date(drive.applicationDeadline);
-      deadline.setHours(23, 59, 59, 999); // Allow applying until 11:59:59 PM of the deadline day
+      deadline.setHours(23, 59, 59, 999); 
       if (new Date() > deadline) {
         return errorResponse(res, 403, "The registration deadline for this drive has passed.");
       }
     }
 
-    // 3. Check if already applied
+    // 4. Check if already applied
     const existingApp = await Application.findOne({ drive: driveId, student: studentId });
     if (existingApp) return errorResponse(res, 400, "You have already applied for this drive.");
 
-    // 4. Double-check mathematical eligibility (The Security Lock)
+    // 5. Check mathematical eligibility 
     const profile = await MemberProfile.findOne({ user: studentId });
     if (!profile) return errorResponse(res, 404, "Student profile not found.");
     
@@ -77,14 +78,23 @@ const applyForDrive = async (req, res) => {
       return errorResponse(res, 403, "Eligibility failed: Your graduation batch is not eligible.");
     }
 
-    // 5. Create the Application
+    // 6. Create the Application (Safely pulling data from DB, not req.body)
     const application = await Application.create({
+      institution: req.institutionId,
       drive: drive._id,
       student: studentId,
-      company: drive.company,
-      status: "APPLIED",
-      appliedAt: new Date()
+      company: drive.company, // Auto-linked from the drive
+      role: drive.roles?.[0]?.title || "Placement Candidate", // Auto-fallback
+      currentStage: "Applied",
+      stageHistory: [{ stage: "Applied", note: "Application submitted", date: Date.now() }],
+      applyDate: Date.now()
     });
+
+    // 7.  NEW: TWO-WAY DATA PUSH (Store IDs in respective models)
+    await Promise.all([
+      PlacementDrive.findByIdAndUpdate(driveId, { $addToSet: { appliedStudents: studentId } }),
+      MemberProfile.findOneAndUpdate({ user: studentId }, { $addToSet: { appliedDrives: driveId } })
+    ]);
 
     return successResponse(res, 201, "Successfully applied for the drive!", application);
   } catch (err) {

@@ -8,15 +8,11 @@ const memberProfileSchema = new mongoose.Schema(
       required: true,
       unique: true,
     },
-
-    // ─── Tenant ───────────────────────────────────────────────────────────
     institution: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "Institution",
       required: true,
     },
-
-    // ─── Academic Structure ───────────────────────────────────────────────
     academicUnit: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "AcademicUnit",
@@ -27,8 +23,6 @@ const memberProfileSchema = new mongoose.Schema(
       ref: "Program",
       default: null,
     },
-
-    // ─── Academic Info ────────────────────────────────────────────────────
     phone: { type: String, default: "" },
     dateOfBirth: { type: Date, default: null },
     rollNumber: { type: String, trim: true, default: "" },
@@ -36,8 +30,6 @@ const memberProfileSchema = new mongoose.Schema(
     graduationYear: { type: Number, default: null },
     cgpa: { type: Number, min: 0, max: 10, default: null },
     activeBacklogs: { type: Number, default: 0 },
-
-    // ─── Skills & Resume ──────────────────────────────────────────────────
     skills: { type: [String], default: [] },
     programmingLanguages: { type: [String], default: [] },
     technicalSkills: { type: [String], default: [] },
@@ -56,34 +48,34 @@ const memberProfileSchema = new mongoose.Schema(
       enum: ["NONE", "PENDING", "VERIFIED", "REJECTED"],
       default: "NONE",
     },
-
-    // ─── Social Links ─────────────────────────────────────────────────────
     linkedIn: { type: String, default: "" },
     github: { type: String, default: "" },
     portfolio: { type: String, default: "" },
-
-    // ─── Bio ──────────────────────────────────────────────────────────────
     bio: {
       type: String,
       maxlength: [500, "Bio cannot exceed 500 characters"],
       default: "",
     },
-
-    // ─── Saved Experiences ────────────────────────────────────────────────
     savedExperiences: [
       {
         type: mongoose.Schema.Types.ObjectId,
         ref: "Experience",
       },
     ],
+    
+    //  NEW: Store the IDs of all drives this student has applied to
+    appliedDrives: [
+      {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "PlacementDrive",
+      },
+    ],
 
-    // ─── Profile Completeness Tracking ────────────────────────────────────
     profileCompletedAt: { type: Date, default: null },
   },
   { timestamps: true }
 );
 
-// ─── Indexes ──────────────────────────────────────────────────────────────
 memberProfileSchema.index({ institution: 1 });
 memberProfileSchema.index({ institution: 1, program: 1 });
 memberProfileSchema.index({ institution: 1, graduationYear: 1 });

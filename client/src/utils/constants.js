@@ -31,7 +31,7 @@ export const ACADEMIC_STATUS_COLORS = {
 export const PLACEMENT_STATUS = [
   { value: "UNPLACED",         label: "Unplaced",          color: "badge-gray"   },
   { value: "SEARCHING",        label: "Actively Searching", color: "badge-indigo" },
-  { value: "PLACED",           label: "Placed ✅",         color: "badge-green"  },
+  { value: "PLACED",           label: "Placed ",         color: "badge-green"  },
   { value: "HIGHER_STUDIES",   label: "Higher Studies",     color: "badge-yellow" },
   { value: "NOT_PARTICIPATING",label: "Not Participating",  color: "badge-gray"   },
   { value: "NOT_APPLICABLE",   label: "N/A",                color: "badge-gray"   },

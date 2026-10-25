@@ -91,7 +91,7 @@ const StudentDashboard = () => {
         <motion.div variants={itemVariants} className="mb-8 flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div>
             <h1 className="text-2xl lg:text-3xl font-bold text-slate-900 tracking-tight flex items-center">
-              {getGreeting()}, <span className="text-indigo-600 ml-2">{user?.name?.split(" ")[0]}</span> 👋
+              {getGreeting()}, <span className="text-indigo-600 ml-2">{user?.name?.split(" ")[0]}</span> !
             </h1>
             <div className="flex items-center gap-2 mt-2">
               <p className="text-sm font-medium text-slate-500">{formatDate(new Date())}</p>

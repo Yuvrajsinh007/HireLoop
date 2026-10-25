@@ -4,20 +4,32 @@ import { motion, AnimatePresence } from "framer-motion";
 import DashboardLayout from "../../components/common/DashboardLayout";
 import Loader from "../../components/common/Loader";
 import { getDrives } from "../../services/driveService";
-import { DRIVE_STATUS, DRIVE_TYPES } from "../../utils/constants";
+import { DRIVE_TYPES } from "../../utils/constants";
 import { formatDate } from "../../utils/formatDate";
 import { useAuth } from "../../hooks/useAuth";
+import api from "../../services/api";
 import toast from "react-hot-toast";
 import { 
   Rocket, Calendar, Briefcase, ChevronLeft, 
-  ChevronRight, Building2, ShieldAlert, GraduationCap 
+  ChevronRight, Building2, ShieldAlert, GraduationCap,
+  Trash2, Loader2
 } from "lucide-react";
 
+const VISIBLE_TABS = [
+  { label: "All Drives", value: "" },
+  { label: "UPCOMING", value: "UPCOMING" },
+  { label: "ACTIVE", value: "ACTIVE" },
+  { label: "COMPLETED", value: "COMPLETED" },
+  { label: "CANCELLED", value: "CANCELLED" }
+];
+
 const DriveList = () => {
-  const { isCurrentStudent } = useAuth();
+  const { isCurrentStudent, user } = useAuth();
+  const isAdmin = user?.role === "collegeAdmin" || user?.role === "officer" || user?.role === "superAdmin";
 
   const [drives, setDrives] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [deletingId, setDeletingId] = useState(null);
   const [total, setTotal] = useState(0);
   const [status, setStatus] = useState("");
   const [page, setPage] = useState(1);
@@ -46,6 +58,30 @@ const DriveList = () => {
     setPage(1);
   }, [status]);
 
+  //  ADMIN DELETE HANDLER
+  const handleDelete = async (e, id, title) => {
+    e.preventDefault(); // Prevents the Link from navigating when clicking the delete button
+    e.stopPropagation();
+
+    if (!window.confirm(`Are you sure you want to permanently delete "${title}"?`)) {
+      return;
+    }
+
+    try {
+      setDeletingId(id);
+      await api.delete(`/drives/${id}`);
+      toast.success("Drive deleted successfully");
+      
+      // Instantly remove it from the UI without reloading
+      setDrives((prevDrives) => prevDrives.filter((drive) => drive._id !== id));
+      setTotal((prevTotal) => prevTotal - 1);
+    } catch (err) {
+      toast.error(err?.response?.data?.message || "Failed to delete drive");
+    } finally {
+      setDeletingId(null);
+    }
+  };
+
   const getStatusColor = (currentStatus) => {
     switch (currentStatus) {
       case "ACTIVE": return "bg-emerald-50 text-emerald-700 border-emerald-200";
@@ -56,7 +92,6 @@ const DriveList = () => {
     }
   };
 
-  // Animation variants
   const containerVariants = { hidden: { opacity: 0 }, show: { opacity: 1, transition: { staggerChildren: 0.05 } } };
   const itemVariants = { hidden: { opacity: 0, y: 20 }, show: { opacity: 1, y: 0 } };
 
@@ -79,7 +114,7 @@ const DriveList = () => {
 
         {/* Filter Tabs */}
         <div className="flex gap-2 overflow-x-auto hide-scrollbar bg-white p-2 rounded-2xl border border-slate-200 shadow-sm mb-8 w-fit">
-          {[{ label: "All", value: "" }, ...DRIVE_STATUS].map((item) => (
+          {VISIBLE_TABS.map((item) => (
             <button
               key={item.value || "all"}
               onClick={() => setStatus(item.value)}
@@ -123,11 +158,11 @@ const DriveList = () => {
                   <Link key={drive._id} to={`/drives/${drive._id}`} className="block h-full">
                     <motion.div 
                       variants={itemVariants} 
-                      className="bg-white rounded-2xl border border-slate-200 shadow-sm hover:shadow-md hover:border-indigo-200 transition-all flex flex-col h-full group"
+                      className="bg-white rounded-2xl border border-slate-200 shadow-sm hover:shadow-md hover:border-indigo-200 transition-all flex flex-col h-full group relative"
                     >
                       <div className="p-5 flex-1 flex flex-col">
                         
-                        {/* Card Header (Logo & Status) */}
+                        {/* Card Header (Logo & Status & Admin Actions) */}
                         <div className="flex items-start justify-between mb-4">
                           <div className="h-12 w-12 rounded-xl bg-slate-50 border border-slate-100 flex items-center justify-center overflow-hidden shrink-0">
                             {drive.company?.logo ? (
@@ -136,9 +171,24 @@ const DriveList = () => {
                               <Building2 className="w-6 h-6 text-slate-300" />
                             )}
                           </div>
-                          <span className={`inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider border ${getStatusColor(drive.status)}`}>
-                            {drive.status}
-                          </span>
+                          
+                          <div className="flex items-center gap-2 relative z-10">
+                            <span className={`inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider border ${getStatusColor(drive.status)}`}>
+                              {drive.status}
+                            </span>
+                            
+                            {/*  QUICK DELETE BUTTON FOR ADMINS ONLY */}
+                            {isAdmin && (
+                              <button
+                                onClick={(e) => handleDelete(e, drive._id, drive.title)}
+                                disabled={deletingId === drive._id}
+                                className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors border border-transparent hover:border-rose-100"
+                                title="Delete Drive"
+                              >
+                                {deletingId === drive._id ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
+                              </button>
+                            )}
+                          </div>
                         </div>
 
                         {/* Title & Company */}

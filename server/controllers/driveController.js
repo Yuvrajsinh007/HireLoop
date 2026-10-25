@@ -8,7 +8,6 @@ const { successResponse, errorResponse } = require("../utils/apiResponse");
 const { tenantFilter, verifyTenantOwnership } = require("../middleware/tenantMiddleware");
 const { writeAudit } = require("../utils/audit");
 
-
 // ─── GET ALL DRIVES (tenant-scoped) ──────────────────────────────────────
 // GET /api/drives
 const getDrives = async (req, res) => {
@@ -17,6 +16,7 @@ const getDrives = async (req, res) => {
     const skip   = (parseInt(page) - 1) * parseInt(limit);
     const filter = tenantFilter(req, {});
 
+    // Filter engine
     if (status) filter.status = status;
 
     const [drives, total] = await Promise.all([
@@ -63,23 +63,21 @@ const getDrive = async (req, res) => {
 // GET /api/drives/eligible (For Students)
 const getEligibleDrives = async (req, res) => {
   try {
-    // 1. Fetch the logged-in student's academic profile
     const profile = await MemberProfile.findOne({ user: req.user._id });
     
     if (!profile || !profile.program || !profile.cgpa) {
       return errorResponse(res, 400, "Please complete your academic profile to see eligible drives.");
     }
 
-    // 2. The Eligibility Engine Query
     const eligibleDrives = await PlacementDrive.find({
       status: { $in: ["ACTIVE", "UPCOMING"] },
       institution: req.user.institution,
-      minCGPA: { $lte: profile.cgpa }, // Drive CGPA must be <= Student CGPA
-      maxBacklogs: { $gte: profile.activeBacklogs || 0 }, // Drive Backlogs must be >= Student Backlogs
-      eligiblePrograms: profile.program, // Student's branch must be in the array
+      minCGPA: { $lte: profile.cgpa }, 
+      maxBacklogs: { $gte: profile.activeBacklogs || 0 }, 
+      eligiblePrograms: profile.program, 
       $or: [
-        { graduationYears: { $size: 0 } }, // If array is empty, all batches allowed
-        { graduationYears: profile.graduationYear } // Or student's batch must match
+        { graduationYears: { $size: 0 } }, 
+        { graduationYears: profile.graduationYear } 
       ]
     }).populate("company", "name logo industry");
 
@@ -99,6 +97,7 @@ const createDrive = async (req, res) => {
       eligiblePrograms, minCGPA, maxBacklogs, graduationYears,
       eligibilityCriteria, roles, rounds, skillsRequired,
       description, resourceLinks,
+      status 
     } = req.body;
 
     if (!company || !title)
@@ -118,6 +117,8 @@ const createDrive = async (req, res) => {
       skillsRequired:   skillsRequired   || [],
       description,
       resourceLinks:    resourceLinks    || [],
+      //  FIX: Defaults to "ACTIVE" instead of "DRAFT" if no status is provided
+      status:           status || "ACTIVE", 
       createdBy:        req.user._id,
     });
 
@@ -246,9 +247,9 @@ const getDriveApplications = async (req, res) => {
     );
     if (!drive) return errorResponse(res, 404, "Drive not found");
 
-    const applications = await Application.find({ drive: req.params.id,
-      institution: req.institutionId,
+    const applications = await Application.find({ 
       drive: req.params.id,
+      institution: req.institutionId
     })
       .populate("student", "name email avatar academicStatus")
       .sort({ createdAt: -1 });

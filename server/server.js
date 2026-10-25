@@ -61,7 +61,7 @@ if (process.env.NODE_ENV === "development") app.use(morgan("dev"));
 app.get("/api/health", (req, res) => {
   res.json({
     success:     true,
-    message:     "HireLoop API is running 🚀",
+    message:     "HireLoop API is running",
     environment: process.env.NODE_ENV,
     timestamp:   new Date().toISOString(),
   });

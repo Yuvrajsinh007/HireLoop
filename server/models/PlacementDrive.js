@@ -9,21 +9,16 @@ const roundSchema = new mongoose.Schema({
 
 const placementDriveSchema = new mongoose.Schema(
   {
-    // ─── Tenant ───────────────────────────────────────────────────────────
     institution: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "Institution",
       required: true,
     },
-
-    // ─── Company ──────────────────────────────────────────────────────────
     company: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "Company",
       required: true,
     },
-
-    // ─── Drive Info ───────────────────────────────────────────────────────
     title: {
       type: String,
       required: [true, "Drive title is required"],
@@ -34,7 +29,7 @@ const placementDriveSchema = new mongoose.Schema(
       enum: ["ON_CAMPUS", "OFF_CAMPUS", "POOL_CAMPUS", "VIRTUAL"],
       default: "ON_CAMPUS",
     },
-    academicYear: { type: String, default: "" }, // e.g. "2024-25"
+    academicYear: { type: String, default: "" }, 
     driveDate: { type: Date, default: null },
     applicationDeadline: { type: Date, default: null },
     status: {
@@ -42,8 +37,6 @@ const placementDriveSchema = new mongoose.Schema(
       enum: ["DRAFT", "UPCOMING", "ACTIVE", "COMPLETED", "CANCELLED", "ARCHIVED"],
       default: "DRAFT",
     },
-
-    // ─── Eligibility ──────────────────────────────────────────────────────
     eligiblePrograms: [
       {
         type: mongoose.Schema.Types.ObjectId,
@@ -61,8 +54,6 @@ const placementDriveSchema = new mongoose.Schema(
     maxBacklogs: { type: Number, default: 0 },
     graduationYears: { type: [Number], default: [] },
     eligibilityCriteria: { type: String, default: "" },
-
-    // ─── Job Details ──────────────────────────────────────────────────────
     roles: [
       {
         title: { type: String, required: true },
@@ -80,12 +71,8 @@ const placementDriveSchema = new mongoose.Schema(
         bond: { type: String, default: "" },
       },
     ],
-
-    // ─── Process ──────────────────────────────────────────────────────────
     rounds: [roundSchema],
     skillsRequired: { type: [String], default: [] },
-
-    // ─── Documents & Resources ────────────────────────────────────────────
     description: { type: String, default: "" },
     resourceLinks: { type: [String], default: [] },
     preparationResources: [
@@ -99,18 +86,22 @@ const placementDriveSchema = new mongoose.Schema(
         },
       },
     ],
-
-    // ─── Management ───────────────────────────────────────────────────────
     createdBy: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "User",
       required: true,
     },
-
-    // ─── Results Summary ──────────────────────────────────────────────────
     totalSelected: { type: Number, default: 0 },
     averageCTC: { type: Number, default: 0 },
     highestCTC: { type: Number, default: 0 },
+    
+    //  NEW: Store all students who apply to this drive for easy querying
+    appliedStudents: [
+      {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "User",
+      },
+    ],
   },
   { timestamps: true }
 );

@@ -40,8 +40,11 @@ const DriveDetail = () => {
   const handleApply = async () => {
     try {
       setApplying(true);
-      await api.post(`/drives/${id}/apply`);
-      toast.success("Application submitted successfully! 🚀");
+      
+      //  FIX: Send an empty object {} so req.body is never completely undefined
+      await api.post(`/drives/${id}/apply`, {});
+      
+      toast.success("Application submitted successfully! ");
       setHasApplied(true);
     } catch (err) {
       const errMsg = err?.response?.data?.message || "Failed to apply.";

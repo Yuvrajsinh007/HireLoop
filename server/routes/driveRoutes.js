@@ -7,8 +7,8 @@ const {
   sendDriveAlert, getDriveApplications,
 } = require("../controllers/driveController");
 
-// Import the apply controller here!
-const { addApplication } = require("../controllers/applicationController"); 
+//  FIX: Import the correct applyForDrive controller function
+const { applyForDrive } = require("../controllers/applicationController"); 
 
 const { protect }        = require("../middleware/authMiddleware");
 const { injectTenant }   = require("../middleware/tenantMiddleware");
@@ -18,7 +18,9 @@ router.use(protect, injectTenant);
 
 // ── Student-Specific Routes ───────────────────────────────────────────────
 router.get("/eligible",  authorize("member", "student"), getEligibleDrives);
-router.post("/:id/apply", authorize("member", "student"), addApplication);
+
+//  FIX: Point the apply route to applyForDrive
+router.post("/:id/apply", authorize("member", "student"), applyForDrive);
 
 // ── Shared/View Routes ────────────────────────────────────────────────────
 router.get("/",          getDrives);

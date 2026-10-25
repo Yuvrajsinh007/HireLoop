@@ -53,7 +53,7 @@ const ExperienceFeed = () => {
 
   const handleExperienceAdded = () => {
     setShowForm(false);
-    // 🚀 FIX: Redirect them to their own posts to see the "Pending" status!
+    //  FIX: Redirect them to their own posts to see the "Pending" status!
     navigate("/my-experiences"); 
   };
 

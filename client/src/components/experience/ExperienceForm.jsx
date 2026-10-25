@@ -59,7 +59,7 @@ const ExperienceForm = ({ onSuccess, onCancel }) => {
     try {
       setLoading(true);
       const res = await createExperience(form);
-      // 🚀 FIX: Better UX Message!
+      //  FIX: Better UX Message!
       toast.success("Submitted successfully! Pending admin verification.", { duration: 5000 });
       if (onSuccess) onSuccess(res.data.data);
     } catch (err) {

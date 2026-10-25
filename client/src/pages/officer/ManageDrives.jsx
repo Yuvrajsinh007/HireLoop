@@ -7,7 +7,7 @@ import toast from "react-hot-toast";
 import { 
   Rocket, Plus, Search, Calendar, MapPin, 
   Briefcase, Users, X, Loader2, ChevronRight, 
-  ChevronLeft, CheckCircle, Bell, Edit2
+  ChevronLeft, CheckCircle, Bell, Edit2, Trash2
 } from "lucide-react";
 
 // Using your exact service imports
@@ -17,13 +17,15 @@ import { getPrograms } from "../../services/institutionService";
 import { DRIVE_TYPES, ROUND_TYPES } from "../../utils/constants";
 import { formatDate } from "../../utils/formatDate";
 
-const STATUS_TABS = ["All", "UPCOMING", "ACTIVE", "COMPLETED", "CANCELLED", "DRAFT"];
+//  STRICT TABS: Removed DRAFT entirely
+const STATUS_TABS = ["All", "UPCOMING", "ACTIVE", "COMPLETED", "CANCELLED"];
 
 const ManageDrives = () => {
   const [drives, setDrives] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [activeTab, setActiveTab] = useState("All");
+  const [deletingId, setDeletingId] = useState(null);
   
   // Modal & Edit State
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -50,9 +52,29 @@ const ManageDrives = () => {
     try {
       const toastId = toast.loading("Calculating eligibility and sending emails...");
       const res = await sendDriveAlert(driveId);
-      toast.success(`Alert sent to ${res.data.data.sent} students! 🚀`, { id: toastId });
+      toast.success(`Alert sent to ${res.data.data.sent} students! `, { id: toastId });
     } catch (err) {
       toast.error(err?.response?.data?.message || "Failed to send alerts");
+    }
+  };
+
+  //  QUICK DELETE HANDLER
+  const handleDelete = async (id, title) => {
+    if (!window.confirm(`Are you sure you want to permanently delete the "${title}" drive?`)) {
+      return;
+    }
+
+    try {
+      setDeletingId(id);
+      await api.delete(`/drives/${id}`);
+      toast.success("Drive deleted successfully");
+      
+      // Remove from UI instantly without refreshing
+      setDrives(prev => prev.filter(drive => drive._id !== id));
+    } catch (err) {
+      toast.error(err?.response?.data?.message || "Failed to delete drive");
+    } finally {
+      setDeletingId(null);
     }
   };
 
@@ -179,9 +201,21 @@ const ManageDrives = () => {
                           </span>
                         </div>
                       </div>
-                      <button onClick={() => openEditModal(drive)} className="p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors opacity-0 group-hover:opacity-100" title="Edit Drive">
-                        <Edit2 className="w-4 h-4" />
-                      </button>
+                      
+                      {/* Action Buttons: Edit and Delete */}
+                      <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <button onClick={() => openEditModal(drive)} className="p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors" title="Edit Drive">
+                          <Edit2 className="w-4 h-4" />
+                        </button>
+                        <button 
+                          onClick={() => handleDelete(drive._id, drive.title)}
+                          disabled={deletingId === drive._id}
+                          className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors border border-transparent hover:border-rose-100" 
+                          title="Delete Drive"
+                        >
+                          {deletingId === drive._id ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
+                        </button>
+                      </div>
                     </div>
 
                     <h3 className="text-lg font-bold text-slate-900 mb-4 line-clamp-2" title={drive.title}>
@@ -334,7 +368,7 @@ const DriveWizardModal = ({ drive, onClose, onSuccess }) => {
 
       if (drive) {
         await updateDrive(drive._id, payload);
-        toast.success("Drive Updated Successfully! ✅");
+        toast.success("Drive Updated Successfully!");
       } else {
         await createDrive(payload);
         toast.success("Placement Drive Created! 🎉");

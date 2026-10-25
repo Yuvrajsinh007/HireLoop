@@ -10,7 +10,7 @@ const welcomeEmailTemplate = (name, clientUrl) => `
 
       <!-- Body -->
       <div style="padding: 40px 32px;">
-        <h2 style="color: #111827; font-size: 22px; margin-top: 0; margin-bottom: 16px;">Welcome to the loop, ${name}! 🚀</h2>
+        <h2 style="color: #111827; font-size: 22px; margin-top: 0; margin-bottom: 16px;">Welcome to the loop, ${name}! </h2>
         <p style="color: #4b5563; font-size: 16px; line-height: 1.6; margin-bottom: 24px;">
           We're thrilled to have you on board. HireLoop is your ultimate campus placement intelligence platform. Here, you can track your application journey, read exclusive interview experiences from seniors, and prepare to land your dream job.
         </p>
